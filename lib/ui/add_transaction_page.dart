@@ -1,4 +1,49 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+
+class AddTransactionResult {
+  const AddTransactionResult({
+    required this.invoiceNumber,
+    required this.company,
+    required this.employee,
+    required this.date,
+    required this.items,
+    this.status = 'معلق',
+  });
+
+  final String invoiceNumber;
+  final String company;
+  final String employee;
+  final String date;
+  final String status;
+  final List<AddTransactionItemResult> items;
+
+  double get grandTotal =>
+      items.fold<double>(0, (sum, item) => sum + item.total);
+
+  bool get hasAttachment => items.any((item) => item.attachments.isNotEmpty);
+}
+
+class AddTransactionItemResult {
+  const AddTransactionItemResult({
+    required this.service,
+    required this.qty,
+    required this.unitPrice,
+    required this.discount,
+    required this.benefit,
+    required this.total,
+    required this.attachments,
+  });
+
+  final String service;
+  final int qty;
+  final double unitPrice;
+  final double discount;
+  final double benefit;
+  final double total;
+  final List<String> attachments;
+}
 
 class AddTransactionPage extends StatefulWidget {
   const AddTransactionPage({
@@ -6,11 +51,13 @@ class AddTransactionPage extends StatefulWidget {
     required this.initialArabic,
     required this.customerNameAr,
     required this.customerNameEn,
+    this.initialData,
   });
 
   final bool initialArabic;
   final String customerNameAr;
   final String customerNameEn;
+  final AddTransactionResult? initialData;
 
   @override
   State<AddTransactionPage> createState() => _AddTransactionPageState();
@@ -33,14 +80,28 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     _isArabic = widget.initialArabic;
 
     final seed = 100 + DateTime.now().millisecond % 900;
-    _invoiceController = TextEditingController(text: '$seed');
-    _companyController = TextEditingController();
-    _employeeController = TextEditingController();
+    _invoiceController = TextEditingController(
+      text: widget.initialData?.invoiceNumber ?? '$seed',
+    );
+    _companyController = TextEditingController(
+      text: widget.initialData?.company ?? '',
+    );
+    _employeeController = TextEditingController(
+      text: widget.initialData?.employee ?? '',
+    );
     _dateController = TextEditingController(
-      text: DateTime.now().toIso8601String().split('T').first,
+      text: widget.initialData?.date ??
+          DateTime.now().toIso8601String().split('T').first,
     );
 
-    _items.add(_ItemData(id: DateTime.now().microsecondsSinceEpoch.toString()));
+    if (widget.initialData != null) {
+      for (final item in widget.initialData!.items) {
+        _items.add(_ItemData.fromResult(item));
+      }
+    }
+    if (_items.isEmpty) {
+      _items.add(_ItemData(id: DateTime.now().microsecondsSinceEpoch.toString()));
+    }
   }
 
   @override
@@ -62,8 +123,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
 
   void _addItem() {
     setState(() {
-      _items
-          .add(_ItemData(id: DateTime.now().microsecondsSinceEpoch.toString()));
+      _items.add(_ItemData(id: DateTime.now().microsecondsSinceEpoch.toString()));
     });
   }
 
@@ -76,20 +136,96 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     });
   }
 
+  Future<void> _pickAttachments(_ItemData item) async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: FileType.custom,
+      allowedExtensions: const [
+        'pdf',
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'bmp',
+        'webp',
+        'tif',
+        'tiff',
+        'svg',
+        'heic',
+        'heif',
+      ],
+    );
+    if (result == null) return;
+
+    setState(() {
+      item.attachments = result.files
+          .map((f) => (f.path ?? '').trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+    });
+
+    if (item.attachments.isEmpty && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t(
+              'تعذر قراءة مسارات الملفات، أعد الاختيار',
+              'Unable to read file paths, please reselect files',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _save() async {
+    if (_companyController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('أدخل اسم الشركة', 'Please enter company name'))),
+      );
+      return;
+    }
+    if (_items.any((item) => item.service.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _t('أدخل نوع الخدمة لكل بند', 'Please enter service type for each item'),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final parsedItems = _items.map((item) {
+      final qty = int.tryParse(item.qty.text.trim()) ?? 0;
+      final price = double.tryParse(item.unitPrice.text.trim()) ?? 0;
+      final discount = double.tryParse(item.discount.text.trim()) ?? 0;
+      final benefit = double.tryParse(item.benefit.text.trim()) ?? 0;
+      return AddTransactionItemResult(
+        service: item.service.text.trim(),
+        qty: qty,
+        unitPrice: price,
+        discount: discount,
+        benefit: benefit,
+        total: item.total,
+        attachments: List<String>.from(item.attachments),
+      );
+    }).toList();
+
+    final payload = AddTransactionResult(
+      invoiceNumber: _invoiceController.text.trim(),
+      company: _companyController.text.trim(),
+      employee: _employeeController.text.trim(),
+      date: _dateController.text.trim(),
+      items: parsedItems,
+      status: widget.initialData?.status ?? 'معلق',
+    );
+
     setState(() => _isSaving = true);
-    await Future<void>.delayed(const Duration(milliseconds: 650));
+    await Future<void>.delayed(const Duration(milliseconds: 350));
     if (!mounted) return;
     setState(() => _isSaving = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF16A34A),
-        content:
-            Text(_t('تم حفظ المعاملة بنجاح', 'Transaction saved successfully')),
-      ),
-    );
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(payload);
   }
 
   @override
@@ -112,7 +248,9 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                   border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
                 ),
                 child: Text(
-                  _t('إضافة معاملة', 'Add Transaction'),
+                  widget.initialData == null
+                      ? _t('إضافة معاملة', 'Add Transaction')
+                      : _t('تعديل معاملة', 'Edit Transaction'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF2563EB),
@@ -130,8 +268,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: const Color(0x402563EB), width: 1.5),
+                    border: Border.all(color: const Color(0x402563EB), width: 1.5),
                   ),
                   child: Row(
                     children: [
@@ -139,7 +276,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                         child: _Field(
                           label: _t('رقم الفاتورة', 'Invoice Number'),
                           controller: _invoiceController,
-                          readOnly: true,
+                          readOnly: widget.initialData != null,
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -214,6 +351,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                               onAdd: _addItem,
                               onRemove: () => _removeItem(item.id),
                               disableRemove: _items.length == 1,
+                              onPickAttachments: () => _pickAttachments(item),
                             ),
                           );
                         }).toList(),
@@ -224,22 +362,20 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
               ),
               Container(
                 width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: const BoxDecoration(
                   color: Colors.white,
-                  border: Border(
-                      top: BorderSide(color: Color(0xFF2B6CB0), width: 2)),
+                  border: Border(top: BorderSide(color: Color(0xFF2B6CB0), width: 2)),
                 ),
                 child: Row(
                   children: [
                     FilledButton(
-                      onPressed:
-                          _isSaving ? null : () => Navigator.of(context).pop(),
+                      onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFFEF4444),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: Text(_t('إلغاء', 'Cancel')),
                     ),
@@ -249,7 +385,8 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF2563EB),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                       child: Text(_t('حفظ', 'Save')),
                     ),
@@ -264,12 +401,10 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 7),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
                         color: const Color(0xFFEFF6FF),
-                        border: Border.all(
-                            color: const Color(0x402563EB), width: 2),
+                        border: Border.all(color: const Color(0x402563EB), width: 2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -301,6 +436,7 @@ class _ItemCard extends StatelessWidget {
     required this.onAdd,
     required this.onRemove,
     required this.disableRemove,
+    required this.onPickAttachments,
   });
 
   final int index;
@@ -310,6 +446,7 @@ class _ItemCard extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onRemove;
   final bool disableRemove;
+  final Future<void> Function() onPickAttachments;
 
   @override
   Widget build(BuildContext context) {
@@ -320,7 +457,10 @@ class _ItemCard extends StatelessWidget {
         border: Border.all(color: const Color(0x332563EB), width: 2),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x140F172A), blurRadius: 10, offset: Offset(0, 3)),
+            color: Color(0x140F172A),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -330,8 +470,7 @@ class _ItemCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2563EB),
                     borderRadius: BorderRadius.circular(8),
@@ -374,33 +513,43 @@ class _ItemCard extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                        child: _NumberField(
-                            label: t('العدد', 'Qty'),
-                            controller: item.qty,
-                            onChanged: onChanged)),
+                      child: _NumberField(
+                        label: t('العدد', 'Qty'),
+                        controller: item.qty,
+                        onChanged: onChanged,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                        child: _NumberField(
-                            label: t('سعر الوحدة', 'Unit Price'),
-                            controller: item.unitPrice,
-                            onChanged: onChanged)),
+                      child: _NumberField(
+                        label: t('سعر الوحدة', 'Unit Price'),
+                        controller: item.unitPrice,
+                        onChanged: onChanged,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                        child: _NumberField(
-                            label: t('الخصم', 'Discount'),
-                            controller: item.discount,
-                            onChanged: onChanged)),
+                      child: _NumberField(
+                        label: t('الخصم', 'Discount'),
+                        controller: item.discount,
+                        onChanged: onChanged,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                        child: _NumberField(
-                            label: t('الفائدة', 'Benefit'),
-                            controller: item.benefit,
-                            onChanged: onChanged)),
+                      child: _NumberField(
+                        label: t('الفائدة', 'Benefit'),
+                        controller: item.benefit,
+                        onChanged: onChanged,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                        child: _ReadOnlyValue(
-                            label: t('الإجمالي', 'Total'),
-                            value: item.total.toStringAsFixed(2))),
+                      child: _ReadOnlyValue(
+                        label: t('الإجمالي', 'Total'),
+                        value: item.total.toStringAsFixed(2),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -408,25 +557,23 @@ class _ItemCard extends StatelessWidget {
                   children: [
                     Text(
                       t('المرفقات', 'Attachments'),
-                      style: const TextStyle(
-                          color: Color(0xFF2B6CB0), fontSize: 13),
+                      style: const TextStyle(color: Color(0xFF2B6CB0), fontSize: 13),
                     ),
                     const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        item.attachmentName.text =
-                            item.attachmentName.text.isEmpty
-                                ? 'selected-file.pdf'
-                                : '';
-                        onChanged();
-                      },
-                      icon: const Icon(Icons.attach_file, size: 14),
-                      label: Text(item.attachmentName.text.isEmpty
-                          ? 'Choose Files'
-                          : item.attachmentName.text),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF2B6CB0),
-                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onPickAttachments,
+                        icon: const Icon(Icons.attach_file, size: 14),
+                        label: Text(
+                          item.attachments.isEmpty
+                              ? t('اختيار ملفات PDF/صور', 'Choose PDF/Images')
+                              : item.attachments.map(p.basename).join(', '),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2B6CB0),
+                          side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
                       ),
                     ),
                   ],
@@ -447,8 +594,7 @@ class _ItemCard extends StatelessWidget {
                 label: Text(t('إضافة بند جديد', 'Add New Item')),
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF16A34A),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
               ),
             ),
@@ -568,8 +714,7 @@ class _Field extends StatelessWidget {
             hintText: hint,
             filled: true,
             fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -580,8 +725,7 @@ class _Field extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide:
-                  const BorderSide(color: Color(0xFF2563EB), width: 1.4),
+              borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.4),
             ),
           ),
         ),
@@ -593,13 +737,24 @@ class _Field extends StatelessWidget {
 class _ItemData {
   _ItemData({required this.id});
 
+  factory _ItemData.fromResult(AddTransactionItemResult result) {
+    final data = _ItemData(id: DateTime.now().microsecondsSinceEpoch.toString());
+    data.service.text = result.service;
+    data.qty.text = result.qty.toString();
+    data.unitPrice.text = result.unitPrice.toStringAsFixed(2);
+    data.discount.text = result.discount.toStringAsFixed(2);
+    data.benefit.text = result.benefit.toStringAsFixed(2);
+    data.attachments = List<String>.from(result.attachments);
+    return data;
+  }
+
   final String id;
   final TextEditingController service = TextEditingController();
   final TextEditingController qty = TextEditingController(text: '1');
   final TextEditingController unitPrice = TextEditingController(text: '0');
   final TextEditingController discount = TextEditingController(text: '0');
   final TextEditingController benefit = TextEditingController(text: '0');
-  final TextEditingController attachmentName = TextEditingController();
+  List<String> attachments = <String>[];
 
   double get total {
     final q = double.tryParse(qty.text.trim()) ?? 0;
@@ -616,6 +771,5 @@ class _ItemData {
     unitPrice.dispose();
     discount.dispose();
     benefit.dispose();
-    attachmentName.dispose();
   }
 }

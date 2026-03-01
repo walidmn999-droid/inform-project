@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/app_database.dart';
 import '../logic/home_logic.dart';
 import 'customer_transactions_page.dart';
 
@@ -13,14 +14,29 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final HomeLogic _logic = HomeLogic();
+  final AppDatabase _db = AppDatabase.instance;
+  final List<Customer> _customers = <Customer>[];
   final Set<int> _selectedIds = <int>{};
   late bool _isArabic;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _isArabic = widget.initialArabic;
+    _loadCustomers();
+  }
+
+  Future<void> _loadCustomers() async {
+    final rows = await _db.getCustomers();
+    if (!mounted) return;
+    setState(() {
+      _customers
+        ..clear()
+        ..addAll(rows);
+      _selectedIds.removeWhere((id) => !_customers.any((c) => c.id == id));
+      _isLoading = false;
+    });
   }
 
   void _toggleCustomer(int id) {
@@ -40,6 +56,248 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _t(String ar, String en) => _isArabic ? ar : en;
+
+  void _showMessage(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+      ),
+    );
+  }
+
+  void _openAddCustomerDialog() {
+    final nameController = TextEditingController();
+    final idController = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('إضافة عميل', 'Add Customer')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: _t('اسم العميل', 'Customer Name'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: idController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'ID'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final rawName = nameController.text.trim();
+                final rawId = idController.text.trim();
+                final parsedId = int.tryParse(rawId);
+
+                if (rawName.isEmpty || parsedId == null) {
+                  _showMessage(
+                    _t('يرجى إدخال اسم صحيح و ID رقمي', 'Please enter a valid name and numeric ID'),
+                    isError: true,
+                  );
+                  return;
+                }
+                if (_customers.any((c) => c.id == parsedId)) {
+                  _showMessage(
+                    _t('رقم ID مستخدم مسبقاً', 'ID already exists'),
+                    isError: true,
+                  );
+                  return;
+                }
+
+                await _db.insertCustomer(
+                  Customer(
+                    id: parsedId,
+                    name: rawName,
+                    nameEn: rawName,
+                  ),
+                );
+                await _loadCustomers();
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                _showMessage(_t('تمت إضافة العميل بنجاح', 'Customer added successfully'));
+              },
+              child: Text(_t('حفظ', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openEditCustomerDialog() {
+    if (_selectedIds.isEmpty) {
+      _showMessage(_t('حدد عميل أولاً للتعديل', 'Select a customer first to edit'), isError: true);
+      return;
+    }
+    if (_selectedIds.length > 1) {
+      _showMessage(
+        _t('يمكن تعديل عميل واحد فقط في كل مرة', 'You can edit only one customer at a time'),
+        isError: true,
+      );
+      return;
+    }
+
+    final selectedId = _selectedIds.first;
+    final index = _customers.indexWhere((c) => c.id == selectedId);
+    if (index == -1) return;
+
+    final target = _customers[index];
+    final nameController = TextEditingController(text: target.name);
+    final idController = TextEditingController(text: target.id.toString());
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('تعديل عميل', 'Edit Customer')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: _t('اسم العميل', 'Customer Name'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: idController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'ID'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final rawName = nameController.text.trim();
+                final rawId = idController.text.trim();
+                final parsedId = int.tryParse(rawId);
+
+                if (rawName.isEmpty || parsedId == null) {
+                  _showMessage(
+                    _t('يرجى إدخال اسم صحيح و ID رقمي', 'Please enter a valid name and numeric ID'),
+                    isError: true,
+                  );
+                  return;
+                }
+                final duplicated = _customers.any(
+                  (c) => c.id == parsedId && c.id != target.id,
+                );
+                if (duplicated) {
+                  _showMessage(
+                    _t('رقم ID مستخدم مسبقاً', 'ID already exists'),
+                    isError: true,
+                  );
+                  return;
+                }
+
+                await _db.updateCustomer(
+                  target.id,
+                  Customer(
+                    id: parsedId,
+                    name: rawName,
+                    nameEn: rawName,
+                  ),
+                );
+                await _loadCustomers();
+                if (!dialogContext.mounted) return;
+                setState(() {
+                  _selectedIds
+                    ..clear()
+                    ..add(parsedId);
+                });
+                Navigator.of(dialogContext).pop();
+                _showMessage(_t('تم حفظ التعديل', 'Changes saved'));
+              },
+              child: Text(_t('حفظ', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openDeleteCustomerDialog() {
+    if (_selectedIds.isEmpty) {
+      _showMessage(_t('حدد عميل أولاً للحذف', 'Select a customer first to delete'), isError: true);
+      return;
+    }
+
+    final codeController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('حذف عميل', 'Delete Customer')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _t(
+                  'هل أنت متأكد من حذف العميل المحدد؟',
+                  'Are you sure you want to delete the selected customer?',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _t('للتأكيد أدخل كود الحذف 1234', 'To confirm, enter delete code 1234'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: codeController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: _t('كود التأكيد', 'Confirmation Code'),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+              onPressed: () async {
+                if (codeController.text.trim() != '1234') {
+                  _showMessage(_t('كود التأكيد غير صحيح', 'Invalid confirmation code'), isError: true);
+                  return;
+                }
+                await _db.deleteCustomers(_selectedIds.toList());
+                await _loadCustomers();
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                _showMessage(_t('تم حذف العميل بنجاح', 'Customer deleted successfully'));
+              },
+              child: Text(_t('حفظ', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +354,7 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '${_logic.totalCustomers} ${_t('عميل', 'Customers')}',
+                          '${_customers.length} ${_t('عميل', 'Customers')}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -115,15 +373,17 @@ class _HomePageState extends State<HomePage> {
                         hoverColor: const Color(0xFF15803D),
                         icon: Icons.person_add_alt_1,
                         text: _t('إضافة عميل', 'Add Customer'),
+                        onPressed: _openAddCustomerDialog,
                       ),
                       _HeaderButton(
                         color: const Color(0xFF2563EB),
                         hoverColor: const Color(0xFF1D4ED8),
                         icon: Icons.edit,
                         text: _t('تعديل عميل', 'Edit Customer'),
+                        onPressed: _openEditCustomerDialog,
                       ),
                       OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: _openDeleteCustomerDialog,
                         icon: const Icon(Icons.delete_outline, size: 16),
                         label: Text(_t('حذف عميل', 'Delete Customer')),
                         style: OutlinedButton.styleFrom(
@@ -196,39 +456,44 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 20),
                     Expanded(
-                      child: GridView.builder(
-                        itemCount: _logic.customers.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 220,
-                          childAspectRatio: 0.95,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                        ),
-                        itemBuilder: (context, index) {
-                          final customer = _logic.customers[index];
-                          final isSelected = _selectedIds.contains(customer.id);
+                      child: _isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : GridView.builder(
+                              itemCount: _customers.length,
+                              gridDelegate:
+                                  const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 220,
+                                childAspectRatio: 0.95,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
+                              itemBuilder: (context, index) {
+                                final customer = _customers[index];
+                                final isSelected =
+                                    _selectedIds.contains(customer.id);
 
-                          return _CustomerCard(
-                            customer: customer,
-                            isSelected: isSelected,
-                            name: _isArabic ? customer.name : customer.nameEn,
-                            onToggle: () => _toggleCustomer(customer.id),
-                            onOpen: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => CustomerTransactionsPage(
-                                    initialArabic: _isArabic,
-                                    customerNameAr: customer.name,
-                                    customerNameEn: customer.nameEn,
-                                    customerId: customer.id,
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
+                                return _CustomerCard(
+                                  customer: customer,
+                                  isSelected: isSelected,
+                                  name: _isArabic
+                                      ? customer.name
+                                      : customer.nameEn,
+                                  onToggle: () => _toggleCustomer(customer.id),
+                                  onOpen: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => CustomerTransactionsPage(
+                                          initialArabic: _isArabic,
+                                          customerNameAr: customer.name,
+                                          customerNameEn: customer.nameEn,
+                                          customerId: customer.id,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
                     ),
                   ],
                 ),

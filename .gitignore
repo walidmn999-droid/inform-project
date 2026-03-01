@@ -47,3 +47,5 @@ app.*.map.json
 tmp_build_output.txt
 tmp_build_output_utf8.txt
 build_windows_verbose.log
+*.db
+inform_project.db
