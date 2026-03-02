@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:archive/archive_io.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -219,6 +220,155 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     );
   }
 
+  List<String> _selectedAttachmentPaths() {
+    final selectedTx = _transactions
+        .where((tx) => _selectedInvoices.contains(tx.invoiceNumber))
+        .toList();
+    final paths = <String>{};
+    for (final tx in selectedTx) {
+      for (final item in tx.items) {
+        for (final path in item.attachmentPaths) {
+          final trimmed = path.trim();
+          if (trimmed.isNotEmpty) {
+            paths.add(trimmed);
+          }
+        }
+      }
+    }
+    return paths.toList();
+  }
+
+  Future<void> _downloadSelectedAttachments() async {
+    if (_selectedInvoices.isEmpty) {
+      _showMsg(
+        _t('حدد معاملة أو أكثر أولاً', 'Select one or more transactions first'),
+        error: true,
+      );
+      return;
+    }
+    final paths = _selectedAttachmentPaths();
+    if (paths.isEmpty) {
+      _showMsg(_t('لا توجد مرفقات في المعاملات المحددة', 'No attachments found'),
+          error: true);
+      return;
+    }
+
+    final userProfile = Platform.environment['USERPROFILE'];
+    if (userProfile == null || userProfile.trim().isEmpty) {
+      _showMsg(_t('تعذر الوصول لمجلد التنزيلات', 'Unable to access Downloads folder'),
+          error: true);
+      return;
+    }
+    final downloadsDir = Directory(p.join(userProfile, 'Downloads'));
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
+
+    final existingFiles = <File>[];
+    for (final filePath in paths) {
+      final source = File(filePath);
+      if (await source.exists()) {
+        existingFiles.add(source);
+      }
+    }
+
+    if (existingFiles.isEmpty) {
+      _showMsg(_t('لم يتم العثور على ملفات فعلية للتحميل',
+          'No valid files were found to download'), error: true);
+      return;
+    }
+
+    final timestamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .replaceAll('.', '-');
+    final zipName = 'attachments_$timestamp.zip';
+    final zipPath = p.join(downloadsDir.path, zipName);
+    final encoder = ZipFileEncoder();
+    encoder.create(zipPath);
+    for (final f in existingFiles) {
+      encoder.addFile(f, p.basename(f.path));
+    }
+    encoder.close();
+
+    _showMsg(_t('تم تحميل المرفقات في ملف مضغوط واحد',
+        'Attachments downloaded as a single ZIP file'));
+  }
+
+  void _deleteSelectedAttachments() {
+    if (_selectedInvoices.isEmpty) {
+      _showMsg(
+        _t('حدد معاملة أو أكثر أولاً', 'Select one or more transactions first'),
+        error: true,
+      );
+      return;
+    }
+
+    final codeController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('حذف المرفقات', 'Delete Attachments')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _t(
+                  'سيتم حذف كل المرفقات من المعاملات المحددة.',
+                  'All attachments for selected transactions will be deleted.',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _t('أدخل كود الحذف 1234 (إجباري)',
+                    'Enter delete code 1234 (required)'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: codeController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    InputDecoration(labelText: _t('كود التأكيد', 'Confirmation code')),
+              ),
+            ],
+            ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                if (codeController.text.trim() != '1234') {
+                  _showMsg(_t('كود الحذف غير صحيح', 'Invalid delete code'),
+                      error: true);
+                  return;
+                }
+                Navigator.of(dialogContext).pop();
+                await _db.deleteAttachmentsForTransactions(
+                  customerId: widget.customerId,
+                  invoiceNumbers: _selectedInvoices.toList(),
+                );
+                await _loadTransactions();
+                if (!mounted) return;
+                _showMsg(_t('تم حذف المرفقات من المعاملات المحددة',
+                    'Attachments deleted from selected transactions'));
+              },
+              child: Text(_t('حذف', 'Delete')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _openAddTransaction() async {
     final result = await Navigator.of(context).push<AddTransactionResult>(
       MaterialPageRoute(
@@ -233,6 +383,19 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     await _db.saveTransaction(customerId: widget.customerId, data: result);
     await _loadTransactions();
     _showMsg(_t('تم حفظ المعاملة', 'Transaction saved'));
+  }
+
+  void _onAttachmentBadgeTap(List<String> paths) {
+    final validPaths = paths.where((e) => e.trim().isNotEmpty).toList();
+    if (validPaths.isEmpty) {
+      _showMsg(_t('لا توجد مرفقات صالحة', 'No valid attachments'), error: true);
+      return;
+    }
+    if (validPaths.length == 1) {
+      _downloadAttachment(validPaths.first);
+      return;
+    }
+    _showAttachmentsDialog(validPaths);
   }
 
   Future<void> _openEditTransaction() async {
@@ -526,6 +689,27 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                           },
                         ),
                         _SideItem(
+                          icon: Icons.groups_outlined,
+                          text: _t('العملاء', 'Customers'),
+                          onPressed: () {
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (_) => HomePage(initialArabic: _isArabic),
+                              ),
+                            );
+                          },
+                        ),
+                        _SideItem(
+                          icon: Icons.download_for_offline_outlined,
+                          text: _t('تحميل المرفقات', 'Download Attachments'),
+                          onPressed: _downloadSelectedAttachments,
+                        ),
+                        _SideItem(
+                          icon: Icons.delete_sweep_outlined,
+                          text: _t('حذف المرفقات', 'Delete Attachments'),
+                          onPressed: _deleteSelectedAttachments,
+                        ),
+                        _SideItem(
                           icon: Icons.receipt_long_outlined,
                           text: _t('الفواتير', 'Invoices'),
                           active: true,
@@ -541,6 +725,20 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                               ),
                             );
                           },
+                        ),
+                        _SideItem(
+                          icon: Icons.bar_chart_outlined,
+                          text: _t('التقارير', 'Reports'),
+                          onPressed: () => _showMsg(
+                            _t('التقارير قيد التطوير', 'Reports feature is coming soon'),
+                          ),
+                        ),
+                        _SideItem(
+                          icon: Icons.settings_outlined,
+                          text: _t('الإعدادات', 'Settings'),
+                          onPressed: () => _showMsg(
+                            _t('الإعدادات قيد التطوير', 'Settings feature is coming soon'),
+                          ),
                         ),
                         const Spacer(),
                         _SideItem(
@@ -805,7 +1003,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                               ? _AttachmentBadge(
                                                                   count: tx.items[i]
                                                                       .attachmentCount,
-                                                                  onTap: () => _showAttachmentsDialog(
+                                                                  onTap: () => _onAttachmentBadgeTap(
                                                                     tx.items[i].attachmentPaths,
                                                                   ),
                                                                 )

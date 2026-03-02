@@ -421,6 +421,38 @@ class AppDatabase {
     );
   }
 
+  Future<void> deleteAttachmentsForTransactions({
+    required int customerId,
+    required List<String> invoiceNumbers,
+  }) async {
+    if (invoiceNumbers.isEmpty) return;
+    final db = await database;
+    final placeholders = List.filled(invoiceNumbers.length, '?').join(',');
+    final txRows = await db.query(
+      'transactions',
+      columns: <String>['id'],
+      where: 'customer_id = ? AND invoice_number IN ($placeholders)',
+      whereArgs: <Object?>[customerId, ...invoiceNumbers],
+    );
+    if (txRows.isEmpty) return;
+    final txIds = txRows.map((r) => r['id'] as int).toList();
+    final txPlaceholders = List.filled(txIds.length, '?').join(',');
+    final itemRows = await db.query(
+      'transaction_items',
+      columns: <String>['id'],
+      where: 'transaction_id IN ($txPlaceholders)',
+      whereArgs: txIds,
+    );
+    if (itemRows.isEmpty) return;
+    final itemIds = itemRows.map((r) => r['id'] as int).toList();
+    final itemPlaceholders = List.filled(itemIds.length, '?').join(',');
+    await db.delete(
+      'item_attachments',
+      where: 'item_id IN ($itemPlaceholders)',
+      whereArgs: itemIds,
+    );
+  }
+
   Future<List<DbTransactionRecord>> getTransactionsForCustomer(int customerId) async {
     final db = await database;
     final txRows = await db.query(
