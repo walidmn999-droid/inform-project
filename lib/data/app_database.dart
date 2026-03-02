@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -50,8 +52,128 @@ class AppDatabase {
   AppDatabase._internal();
   static final AppDatabase instance = AppDatabase._internal();
   static const int _dbVersion = 2;
+  static const String _attachmentsRoot =
+      r'C:\Projects\inform-project-exe\attachments';
 
   Database? _db;
+
+  Future<Directory> _attachmentsRootDir() async {
+    final dir = Directory(_attachmentsRoot);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    return dir;
+  }
+
+  bool _isManagedAttachmentPath(String filePath) {
+    final normalizedPath = p.normalize(filePath).toLowerCase();
+    final managedRoot = p.normalize(_attachmentsRoot).toLowerCase();
+    return normalizedPath.startsWith(managedRoot);
+  }
+
+  String _safeSegment(String value) {
+    final out = value.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    return out.isEmpty ? 'x' : out;
+  }
+
+  Future<String?> _prepareAttachmentPath(
+    String sourcePath, {
+    required int customerId,
+    required String invoiceNumber,
+  }) async {
+    final trimmed = sourcePath.trim();
+    if (trimmed.isEmpty) return null;
+
+    final sourceFile = File(trimmed);
+    if (_isManagedAttachmentPath(trimmed)) {
+      return await sourceFile.exists() ? sourceFile.path : null;
+    }
+    if (!await sourceFile.exists()) return null;
+
+    final rootDir = await _attachmentsRootDir();
+    final originalName = p.basename(trimmed);
+    final baseName = _safeSegment(p.basenameWithoutExtension(originalName));
+    final ext = p.extension(originalName);
+    final invoicePart = _safeSegment(invoiceNumber);
+    final now = DateTime.now().microsecondsSinceEpoch;
+
+    String candidate = p.join(
+      rootDir.path,
+      '${customerId}_${invoicePart}_${now}_$baseName$ext',
+    );
+    var suffix = 1;
+    while (await File(candidate).exists()) {
+      candidate = p.join(
+        rootDir.path,
+        '${customerId}_${invoicePart}_${now}_${baseName}_$suffix$ext',
+      );
+      suffix++;
+    }
+    await sourceFile.copy(candidate);
+    return candidate;
+  }
+
+  Future<List<String>> _collectAttachmentPathsForItemIds(
+    DatabaseExecutor db,
+    List<int> itemIds,
+  ) async {
+    if (itemIds.isEmpty) return const <String>[];
+    final placeholders = List.filled(itemIds.length, '?').join(',');
+    final rows = await db.query(
+      'item_attachments',
+      columns: <String>['file_path'],
+      where: 'item_id IN ($placeholders)',
+      whereArgs: itemIds,
+    );
+    return rows
+        .map((r) => (r['file_path'] as String?)?.trim() ?? '')
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> _deleteFilesSilently(Iterable<String> paths) async {
+    for (final raw in paths) {
+      final path = raw.trim();
+      if (path.isEmpty) continue;
+      final file = File(path);
+      try {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {
+        // Ignore individual file delete failures.
+      }
+    }
+  }
+
+  Future<void> _migrateLegacyAttachmentsToManagedStorage(Database db) async {
+    final rows = await db.query(
+      'item_attachments',
+      columns: <String>['id', 'file_path'],
+    );
+    for (final row in rows) {
+      final id = row['id'] as int;
+      final currentPath = (row['file_path'] as String?)?.trim() ?? '';
+      if (currentPath.isEmpty || _isManagedAttachmentPath(currentPath)) {
+        continue;
+      }
+      final migrated = await _prepareAttachmentPath(
+        currentPath,
+        customerId: 0,
+        invoiceNumber: 'legacy',
+      );
+      if (migrated == null) continue;
+      await db.update(
+        'item_attachments',
+        <String, Object?>{
+          'file_name': p.basename(migrated),
+          'file_path': migrated,
+        },
+        where: 'id = ?',
+        whereArgs: <Object?>[id],
+      );
+    }
+  }
 
   Future<Database> get database async {
     if (_db != null) return _db!;
@@ -75,6 +197,8 @@ class AppDatabase {
         },
       ),
     );
+    await _attachmentsRootDir();
+    await _migrateLegacyAttachmentsToManagedStorage(_db!);
     return _db!;
   }
 
@@ -275,7 +399,8 @@ class AppDatabase {
         conflictAlgorithm: ConflictAlgorithm.abort,
       );
 
-      for (final item in data.items) {
+      for (int itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
+        final item = data.items[itemIndex];
         final itemId = await txn.insert(
           'transaction_items',
           <String, Object?>{
@@ -292,15 +417,19 @@ class AppDatabase {
         );
 
         for (final rawPath in item.attachments) {
-          final fullPath = rawPath.trim();
-          if (fullPath.isEmpty) continue;
-          final fileName = p.basename(fullPath);
+          final preparedPath = await _prepareAttachmentPath(
+            rawPath,
+            customerId: customerId,
+            invoiceNumber: data.invoiceNumber,
+          );
+          if (preparedPath == null) continue;
+          final fileName = p.basename(preparedPath);
           await txn.insert(
             'item_attachments',
             <String, Object?>{
               'item_id': itemId,
               'file_name': fileName,
-              'file_path': fullPath,
+              'file_path': preparedPath,
               'created_at': DateTime.now().toIso8601String(),
             },
           );
@@ -331,6 +460,10 @@ class AppDatabase {
         where: 'transaction_id = ?',
         whereArgs: <Object?>[txId],
       );
+      final oldItemIds = itemRows.map((r) => r['id'] as int).toList();
+      final oldAttachmentPaths =
+          await _collectAttachmentPathsForItemIds(txn, oldItemIds);
+
       for (final r in itemRows) {
         final itemId = r['id'] as int;
         await txn.delete(
@@ -359,7 +492,9 @@ class AppDatabase {
         whereArgs: <Object?>[txId],
       );
 
-      for (final item in data.items) {
+      final newAttachmentPaths = <String>{};
+      for (int itemIndex = 0; itemIndex < data.items.length; itemIndex++) {
+        final item = data.items[itemIndex];
         final itemId = await txn.insert(
           'transaction_items',
           <String, Object?>{
@@ -375,19 +510,29 @@ class AppDatabase {
           },
         );
         for (final rawPath in item.attachments) {
-          final fullPath = rawPath.trim();
-          if (fullPath.isEmpty) continue;
+          final preparedPath = await _prepareAttachmentPath(
+            rawPath,
+            customerId: customerId,
+            invoiceNumber: data.invoiceNumber,
+          );
+          if (preparedPath == null) continue;
+          newAttachmentPaths.add(preparedPath);
           await txn.insert(
             'item_attachments',
             <String, Object?>{
               'item_id': itemId,
-              'file_name': p.basename(fullPath),
-              'file_path': fullPath,
+              'file_name': p.basename(preparedPath),
+              'file_path': preparedPath,
               'created_at': DateTime.now().toIso8601String(),
             },
           );
         }
       }
+
+      final toDelete = oldAttachmentPaths
+          .where((path) => !newAttachmentPaths.contains(path))
+          .toList();
+      await _deleteFilesSilently(toDelete);
     });
   }
 
@@ -398,11 +543,32 @@ class AppDatabase {
     if (invoiceNumbers.isEmpty) return;
     final db = await database;
     final placeholders = List.filled(invoiceNumbers.length, '?').join(',');
+    final txRows = await db.query(
+      'transactions',
+      columns: <String>['id'],
+      where: 'customer_id = ? AND invoice_number IN ($placeholders)',
+      whereArgs: <Object?>[customerId, ...invoiceNumbers],
+    );
+    final txIds = txRows.map((r) => r['id'] as int).toList();
+    List<String> attachmentPaths = const <String>[];
+    if (txIds.isNotEmpty) {
+      final txPlaceholders = List.filled(txIds.length, '?').join(',');
+      final itemRows = await db.query(
+        'transaction_items',
+        columns: <String>['id'],
+        where: 'transaction_id IN ($txPlaceholders)',
+        whereArgs: txIds,
+      );
+      final itemIds = itemRows.map((r) => r['id'] as int).toList();
+      attachmentPaths = await _collectAttachmentPathsForItemIds(db, itemIds);
+    }
+
     await db.delete(
       'transactions',
       where: 'customer_id = ? AND invoice_number IN ($placeholders)',
       whereArgs: <Object?>[customerId, ...invoiceNumbers],
     );
+    await _deleteFilesSilently(attachmentPaths);
   }
 
   Future<void> updateTransactionsStatus({
@@ -445,12 +611,14 @@ class AppDatabase {
     );
     if (itemRows.isEmpty) return;
     final itemIds = itemRows.map((r) => r['id'] as int).toList();
+    final attachmentPaths = await _collectAttachmentPathsForItemIds(db, itemIds);
     final itemPlaceholders = List.filled(itemIds.length, '?').join(',');
     await db.delete(
       'item_attachments',
       where: 'item_id IN ($itemPlaceholders)',
       whereArgs: itemIds,
     );
+    await _deleteFilesSilently(attachmentPaths);
   }
 
   Future<List<DbTransactionRecord>> getTransactionsForCustomer(int customerId) async {

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:flutter/material.dart';
+import 'package:open_file_plus/open_file_plus.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/app_database.dart';
@@ -104,120 +105,20 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     final file = File(filePath);
     if (!await file.exists()) {
       if (!mounted) return;
-      _showMsg(_t('الملف غير موجود على الجهاز', 'File does not exist'), error: true);
+      _showMsg(_t('تعذر فتح الملف', 'Unable to open file'), error: true);
       return;
     }
 
     try {
-      if (Platform.isWindows) {
-        await Process.start('cmd', <String>['/c', 'start', '', file.path]);
-      } else if (Platform.isMacOS) {
-        await Process.start('open', <String>[file.path]);
-      } else if (Platform.isLinux) {
-        await Process.start('xdg-open', <String>[file.path]);
+      final result = await OpenFile.open(file.path);
+      if (result.type != ResultType.done) {
+        if (!mounted) return;
+        _showMsg(_t('تعذر فتح الملف', 'Unable to open file'), error: true);
       }
     } catch (_) {
       if (!mounted) return;
       _showMsg(_t('تعذر فتح الملف', 'Unable to open file'), error: true);
     }
-  }
-
-  Future<void> _downloadAttachment(String filePath) async {
-    final source = File(filePath);
-    if (!await source.exists()) {
-      if (!mounted) return;
-      _showMsg(_t('الملف غير موجود على الجهاز', 'File does not exist'), error: true);
-      return;
-    }
-
-    final userProfile = Platform.environment['USERPROFILE'];
-    if (userProfile == null || userProfile.trim().isEmpty) {
-      if (!mounted) return;
-      _showMsg(_t('تعذر الوصول لمجلد التنزيلات', 'Unable to access Downloads folder'),
-          error: true);
-      return;
-    }
-
-    final downloadsDir = Directory(p.join(userProfile, 'Downloads'));
-    if (!await downloadsDir.exists()) {
-      await downloadsDir.create(recursive: true);
-    }
-
-    final sourceName = p.basename(source.path);
-    String targetPath = p.join(downloadsDir.path, sourceName);
-    int suffix = 1;
-    while (await File(targetPath).exists()) {
-      final base = p.basenameWithoutExtension(sourceName);
-      final ext = p.extension(sourceName);
-      targetPath = p.join(downloadsDir.path, '${base}_$suffix$ext');
-      suffix++;
-    }
-
-    await source.copy(targetPath);
-    if (!mounted) return;
-    _showMsg(_t('تم تحميل الملف إلى التنزيلات', 'File downloaded to Downloads'));
-  }
-
-  void _showAttachmentsDialog(List<String> paths) {
-    final validPaths = paths.where((e) => e.trim().isNotEmpty).toList();
-    if (validPaths.isEmpty) {
-      _showMsg(_t('لا توجد مرفقات صالحة', 'No valid attachments'), error: true);
-      return;
-    }
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(_t('مرفقات المعاملة', 'Transaction Attachments')),
-          content: SizedBox(
-            width: 560,
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: validPaths.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final filePath = validPaths[index];
-                final fileName = p.basename(filePath);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.attach_file, color: Color(0xFF2563EB), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          fileName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => _openAttachmentFile(filePath),
-                        icon: const Icon(Icons.open_in_new, size: 16),
-                        label: Text(_t('فتح', 'Open')),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => _downloadAttachment(filePath),
-                        icon: const Icon(Icons.download, size: 16),
-                        label: Text(_t('تحميل', 'Download')),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(_t('إغلاق', 'Close')),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   List<String> _selectedAttachmentPaths() {
@@ -285,9 +186,28 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     final zipName = 'attachments_$timestamp.zip';
     final zipPath = p.join(downloadsDir.path, zipName);
     final encoder = ZipFileEncoder();
+    final usedEntryNames = <String>{};
+
+    String uniqueEntryName(String originalName) {
+      if (!usedEntryNames.contains(originalName)) {
+        usedEntryNames.add(originalName);
+        return originalName;
+      }
+      final base = p.basenameWithoutExtension(originalName);
+      final ext = p.extension(originalName);
+      var i = 1;
+      var candidate = '${base}_$i$ext';
+      while (usedEntryNames.contains(candidate)) {
+        i++;
+        candidate = '${base}_$i$ext';
+      }
+      usedEntryNames.add(candidate);
+      return candidate;
+    }
+
     encoder.create(zipPath);
     for (final f in existingFiles) {
-      encoder.addFile(f, p.basename(f.path));
+      encoder.addFile(f, uniqueEntryName(p.basename(f.path)));
     }
     encoder.close();
 
@@ -322,8 +242,8 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
               ),
               const SizedBox(height: 10),
               Text(
-                _t('أدخل كود الحذف 1234 (إجباري)',
-                    'Enter delete code 1234 (required)'),
+                _t('أدخل كود الحذف 123 (إجباري)',
+                    'Enter delete code 123 (required)'),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
@@ -346,7 +266,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
-                if (codeController.text.trim() != '1234') {
+                if (codeController.text.trim() != '123') {
                   _showMsg(_t('كود الحذف غير صحيح', 'Invalid delete code'),
                       error: true);
                   return;
@@ -385,17 +305,13 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     _showMsg(_t('تم حفظ المعاملة', 'Transaction saved'));
   }
 
-  void _onAttachmentBadgeTap(List<String> paths) {
-    final validPaths = paths.where((e) => e.trim().isNotEmpty).toList();
-    if (validPaths.isEmpty) {
+  void _onAttachmentIconTap(List<String> allPaths, int index) {
+    final validPaths = allPaths.where((e) => e.trim().isNotEmpty).toList();
+    if (validPaths.isEmpty || index < 0 || index >= validPaths.length) {
       _showMsg(_t('لا توجد مرفقات صالحة', 'No valid attachments'), error: true);
       return;
     }
-    if (validPaths.length == 1) {
-      _downloadAttachment(validPaths.first);
-      return;
-    }
-    _showAttachmentsDialog(validPaths);
+    _openAttachmentFile(validPaths[index]);
   }
 
   Future<void> _openEditTransaction() async {
@@ -883,7 +799,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                 align: TextAlign.center),
                             _HeaderCell(_t('اسم الشركة', 'Company'), 1.8),
                             _HeaderCell(_t('اسم الموظف', 'Employee'), 1.3),
-                            _HeaderCell(_t('المرفقات', 'Files'), 0.8,
+                            _HeaderCell(_t('المرفقات', 'Files'), 1.8,
                                 align: TextAlign.center),
                           ],
                         ),
@@ -993,28 +909,26 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                       weight: FontWeight.w500,
                                                     ),
                                                     Expanded(
-                                                      flex: 1,
-                                                      child: Center(
-                                                        child: FittedBox(
-                                                          fit: BoxFit.scaleDown,
-                                                          child: tx.items[i]
-                                                                      .attachmentCount >
-                                                                  0
-                                                              ? _AttachmentBadge(
-                                                                  count: tx.items[i]
-                                                                      .attachmentCount,
-                                                                  onTap: () => _onAttachmentBadgeTap(
-                                                                    tx.items[i].attachmentPaths,
-                                                                  ),
-                                                                )
-                                                              : const Text(
-                                                                  '-',
-                                                                  style: TextStyle(
-                                                                    color: Color(
-                                                                        0xFFCBD5E1),
-                                                                    fontSize: 12,
-                                                                  ),
-                                                                ),
+                                                      flex: 18,
+                                                      child: Align(
+                                                        alignment: Alignment.center,
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                            vertical: 2,
+                                                            horizontal: 4,
+                                                          ),
+                                                          child: _AttachmentIcons(
+                                                            attachmentPaths:
+                                                                tx.items[i]
+                                                                    .attachmentPaths,
+                                                            onTapFile: (index) =>
+                                                                _onAttachmentIconTap(
+                                                              tx.items[i]
+                                                                  .attachmentPaths,
+                                                              index,
+                                                            ),
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
@@ -1425,40 +1339,71 @@ class _BodyCell extends StatelessWidget {
   }
 }
 
-class _AttachmentBadge extends StatelessWidget {
-  const _AttachmentBadge({required this.count, required this.onTap});
+class _AttachmentIcons extends StatelessWidget {
+  const _AttachmentIcons({
+    required this.attachmentPaths,
+    required this.onTapFile,
+  });
 
-  final int count;
-  final VoidCallback onTap;
+  final List<String> attachmentPaths;
+  final ValueChanged<int> onTapFile;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: onTap,
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 28),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2563EB),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+    final validPaths = attachmentPaths.where((e) => e.trim().isNotEmpty).toList();
+    if (validPaths.isEmpty) {
+      return const Text(
+        '-',
+        style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hasFiniteWidth = constraints.maxWidth.isFinite;
+        final availableWidth = hasFiniteWidth ? constraints.maxWidth : 360.0;
+        final chipWidth = (availableWidth - 12) / 3;
+
+        return Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          alignment: WrapAlignment.center,
           children: [
-            const Icon(Icons.attach_file, color: Colors.white, size: 12),
-            const SizedBox(width: 2),
-            Text(
-              '$count',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
+            for (int i = 0; i < validPaths.length; i++)
+              SizedBox(
+                width: chipWidth > 84 ? chipWidth : 84,
+                child: ActionChip(
+                  onPressed: () => onTapFile(i),
+                  avatar: const Icon(
+                    Icons.attach_file,
+                    size: 14,
+                    color: Color(0xFF2563EB),
+                  ),
+                  label: Text(
+                    p.basename(validPaths[i]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+                  backgroundColor: const Color(0xFFEFF6FF),
+                  side: const BorderSide(color: Color(0xFFBFDBFE)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity:
+                      const VisualDensity(horizontal: -2, vertical: -2),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                ),
               ),
-            ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }

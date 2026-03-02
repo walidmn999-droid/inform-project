@@ -139,21 +139,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
   Future<void> _pickAttachments(_ItemData item) async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: const [
-        'pdf',
-        'jpg',
-        'jpeg',
-        'png',
-        'gif',
-        'bmp',
-        'webp',
-        'tif',
-        'tiff',
-        'svg',
-        'heic',
-        'heif',
-      ],
+      type: FileType.any,
     );
     if (result == null) return;
 
@@ -566,7 +552,8 @@ class _ItemCard extends StatelessWidget {
                         icon: const Icon(Icons.attach_file, size: 14),
                         label: Text(
                           item.attachments.isEmpty
-                              ? t('اختيار ملفات PDF/صور', 'Choose PDF/Images')
+                              ? t('اختيار ملفات (أي امتداد)',
+                                  'Choose files (any extension)')
                               : item.attachments.map(p.basename).join(', '),
                           overflow: TextOverflow.ellipsis,
                         ),
