@@ -6,6 +6,18 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../logic/home_logic.dart';
 import '../ui/add_transaction_page.dart';
 
+class DbAttachmentRecord {
+  const DbAttachmentRecord({
+    required this.id,
+    required this.fileName,
+    required this.filePath,
+  });
+
+  final int id;
+  final String fileName;
+  final String filePath;
+}
+
 class DbTransactionItemRecord {
   const DbTransactionItemRecord({
     required this.serviceAr,
@@ -15,7 +27,7 @@ class DbTransactionItemRecord {
     required this.discount,
     required this.benefit,
     required this.total,
-    required this.attachmentPaths,
+    required this.attachments,
   });
 
   final String serviceAr;
@@ -25,7 +37,9 @@ class DbTransactionItemRecord {
   final double discount;
   final double benefit;
   final double total;
-  final List<String> attachmentPaths;
+  final List<DbAttachmentRecord> attachments;
+  List<String> get attachmentPaths =>
+      attachments.map((a) => a.filePath).toList(growable: false);
 }
 
 class DbTransactionRecord {
@@ -621,6 +635,47 @@ class AppDatabase {
     await _deleteFilesSilently(attachmentPaths);
   }
 
+  Future<void> deleteAttachmentById(int attachmentId) async {
+    final db = await database;
+    final rows = await db.query(
+      'item_attachments',
+      columns: <String>['file_path'],
+      where: 'id = ?',
+      whereArgs: <Object?>[attachmentId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return;
+    final filePath = (rows.first['file_path'] as String?)?.trim() ?? '';
+    await db.delete(
+      'item_attachments',
+      where: 'id = ?',
+      whereArgs: <Object?>[attachmentId],
+    );
+    await _deleteFilesSilently(<String>[filePath]);
+  }
+
+  Future<String?> getAppMetaValue(String key) async {
+    final db = await database;
+    final rows = await db.query(
+      'app_meta',
+      columns: <String>['value'],
+      where: 'key = ?',
+      whereArgs: <Object?>[key],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String?;
+  }
+
+  Future<void> setAppMetaValue(String key, String value) async {
+    final db = await database;
+    await db.insert(
+      'app_meta',
+      <String, Object?>{'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
   Future<List<DbTransactionRecord>> getTransactionsForCustomer(int customerId) async {
     final db = await database;
     final txRows = await db.query(
@@ -645,6 +700,7 @@ class AppDatabase {
         final itemId = item['id'] as int;
         final attachmentRows = await db.query(
           'item_attachments',
+          columns: <String>['id', 'file_name', 'file_path'],
           where: 'item_id = ?',
           whereArgs: <Object?>[itemId],
           orderBy: 'id ASC',
@@ -658,9 +714,15 @@ class AppDatabase {
             discount: ((item['discount'] as num?) ?? 0).toDouble(),
             benefit: ((item['benefit'] as num?) ?? 0).toDouble(),
             total: ((item['total'] as num?) ?? 0).toDouble(),
-            attachmentPaths: attachmentRows
-                .map((r) => (r['file_path'] as String?) ?? '')
-                .where((e) => e.isNotEmpty)
+            attachments: attachmentRows
+                .map(
+                  (r) => DbAttachmentRecord(
+                    id: (r['id'] as int?) ?? 0,
+                    fileName: (r['file_name'] as String?) ?? '',
+                    filePath: (r['file_path'] as String?) ?? '',
+                  ),
+                )
+                .where((a) => a.id > 0 && a.filePath.trim().isNotEmpty)
                 .toList(),
           ),
         );

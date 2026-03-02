@@ -6,7 +6,9 @@ import 'package:open_file_plus/open_file_plus.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/app_database.dart';
+import '../logic/design_controller.dart';
 import 'add_transaction_page.dart';
+import 'design_settings_page.dart';
 import 'home_page.dart';
 import 'invoices_page.dart';
 
@@ -31,6 +33,7 @@ class CustomerTransactionsPage extends StatefulWidget {
 
 class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   final AppDatabase _db = AppDatabase.instance;
+  final DesignController _design = DesignController.instance;
   final Set<String> _selectedInvoices = <String>{};
   final List<_TxRecord> _transactions = <_TxRecord>[];
   late bool _isArabic;
@@ -242,8 +245,8 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
               ),
               const SizedBox(height: 10),
               Text(
-                _t('أدخل كود الحذف 123 (إجباري)',
-                    'Enter delete code 123 (required)'),
+                _t('أدخل كود الحذف 1234 (إجباري)',
+                    'Enter delete code 1234 (required)'),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 10),
@@ -266,7 +269,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
-                if (codeController.text.trim() != '123') {
+                if (codeController.text.trim() != '1234') {
                   _showMsg(_t('كود الحذف غير صحيح', 'Invalid delete code'),
                       error: true);
                   return;
@@ -312,6 +315,75 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
       return;
     }
     _openAttachmentFile(validPaths[index]);
+  }
+
+  Future<void> _deleteSingleAttachment(_TxAttachment attachment) async {
+    if (attachment.id == null) {
+      _showMsg(_t('لا يمكن حذف هذا المرفق', 'Cannot delete this attachment'),
+          error: true);
+      return;
+    }
+
+    final codeController = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('تأكيد حذف المرفق', 'Confirm attachment deletion')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _t(
+                  'سيتم حذف هذا المرفق نهائياً. هل تريد المتابعة؟',
+                  'This attachment will be deleted permanently. Continue?',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _t('أدخل كود الحذف 1234 (إجباري)',
+                    'Enter delete code 1234 (required)'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: codeController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: _t('كود التأكيد', 'Confirmation code'),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                if (codeController.text.trim() != '1234') {
+                  _showMsg(_t('كود الحذف غير صحيح', 'Invalid delete code'),
+                      error: true);
+                  return;
+                }
+                Navigator.of(dialogContext).pop();
+                await _db.deleteAttachmentById(attachment.id!);
+                await _loadTransactions();
+                if (!mounted) return;
+                _showMsg(_t('تم حذف المرفق', 'Attachment deleted'));
+              },
+              child: Text(_t('حذف', 'Delete')),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _openEditTransaction() async {
@@ -364,6 +436,21 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
         ..add(updated.invoiceNumber);
     });
     _showMsg(_t('تم تعديل المعاملة', 'Transaction updated'));
+  }
+
+  Future<void> _openDesignSettings() async {
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        barrierColor: const Color(0x22000000),
+        pageBuilder: (_, __, ___) => DesignSettingsPage(
+          isArabic: _isArabic,
+          asOverlay: true,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _openDeleteDialog() {
@@ -498,14 +585,68 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
         _isArabic ? widget.customerNameAr : widget.customerNameEn;
     final tableDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     final data = _sortedTransactions;
-
+    return AnimatedBuilder(
+      animation: _design,
+      builder: (context, _) {
+        final cfg = _design.config;
+        Color tone(Color c) => _design.shiftColor(c, cfg.uiBrightnessShift);
+        Color ensureVisibleBg(Color c) {
+          const canvas = Color(0xFFF8FAFC);
+          if (_design.hasGoodContrast(c, canvas, minRatio: 1.35)) return c;
+          final makeDarker = c.computeLuminance() > canvas.computeLuminance();
+          return _design.shiftColor(c, makeDarker ? -0.22 : 0.22);
+        }
+        Color safeTextFor(Color bg) => _design.hasGoodContrast(cfg.buttonTextColor, bg,
+                minRatio: 3.5)
+            ? cfg.buttonTextColor
+            : _design.onColorFor(bg);
+        final buttonRadius = switch (cfg.buttonShapeStyle) {
+          1 => 999.0,
+          2 => 2.0,
+          3 => 14.0,
+          _ => cfg.buttonRadius,
+        };
+        final buttonBgColor = ensureVisibleBg(tone(cfg.buttonBgColor));
+        final addBtnColor = cfg.useDistinctActionButtonColors
+            ? ensureVisibleBg(tone(cfg.actionAddButtonColor))
+            : buttonBgColor;
+        final editBtnColor = cfg.useDistinctActionButtonColors
+            ? ensureVisibleBg(tone(cfg.actionEditButtonColor))
+            : buttonBgColor;
+        final deleteBtnColor = cfg.useDistinctActionButtonColors
+            ? ensureVisibleBg(tone(cfg.actionDeleteButtonColor))
+            : buttonBgColor;
+        final statusBtnColor = cfg.useDistinctActionButtonColors
+            ? ensureVisibleBg(tone(cfg.actionStatusButtonColor))
+            : buttonBgColor;
+        final addBtnTextColor = safeTextFor(addBtnColor);
+        final editBtnTextColor = safeTextFor(editBtnColor);
+        final deleteBtnTextColor = safeTextFor(deleteBtnColor);
+        final statusBtnTextColor = safeTextFor(statusBtnColor);
+        final headerTextColor = _design.onColorFor(tone(cfg.tableHeaderColor));
+        final onCardTextColor = _design.onColorFor(tone(cfg.transactionCardColor));
     return Scaffold(
-      body: Row(
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Row(
         textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
         children: [
-          Container(
+          SizedBox(
             width: 240,
-            color: const Color(0xFF2B6CB0),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: tone(cfg.sidebarColor),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1F0F172A),
+                    blurRadius: 18,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
             child: Column(
               children: [
                 Container(
@@ -513,8 +654,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                   padding:
                       const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                   decoration: const BoxDecoration(
-                    border:
-                        Border(bottom: BorderSide(color: Color(0x26FFFFFF))),
+                      border: Border(bottom: BorderSide(color: Color(0x26FFFFFF))),
                   ),
                   child: Column(
                     children: [
@@ -554,8 +694,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        _t('إنفورم للطباعة والتصوير',
-                            'Inform Typing & Photo Copy'),
+                          _t('إنفورم للطباعة والتصوير', 'Inform Typing & Photo Copy'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Color(0xFF93B5D3),
@@ -569,18 +708,21 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: const BoxDecoration(
-                    border:
-                        Border(bottom: BorderSide(color: Color(0x26FFFFFF))),
+                      border: Border(bottom: BorderSide(color: Color(0x26FFFFFF))),
                   ),
                   child: SizedBox(
                     width: double.infinity,
                     child: TextButton(
                       onPressed: () => setState(() => _isArabic = !_isArabic),
                       style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E5A8A),
-                        foregroundColor: Colors.white,
+                        backgroundColor: buttonBgColor,
+                        foregroundColor: safeTextFor(buttonBgColor),
+                        side: BorderSide(
+                          color: cfg.buttonBorderColor,
+                          width: cfg.buttonBorderWidth,
+                        ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(buttonRadius),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
@@ -596,6 +738,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         _SideItem(
                           icon: Icons.home_outlined,
                           text: _t('الرئيسية', 'Home'),
+                          fontWeightLevel: cfg.fontWeightLevel,
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
@@ -607,6 +750,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         _SideItem(
                           icon: Icons.groups_outlined,
                           text: _t('العملاء', 'Customers'),
+                          fontWeightLevel: cfg.fontWeightLevel,
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
@@ -618,17 +762,20 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         _SideItem(
                           icon: Icons.download_for_offline_outlined,
                           text: _t('تحميل المرفقات', 'Download Attachments'),
+                          fontWeightLevel: cfg.fontWeightLevel,
                           onPressed: _downloadSelectedAttachments,
                         ),
                         _SideItem(
                           icon: Icons.delete_sweep_outlined,
                           text: _t('حذف المرفقات', 'Delete Attachments'),
+                          fontWeightLevel: cfg.fontWeightLevel,
                           onPressed: _deleteSelectedAttachments,
                         ),
                         _SideItem(
                           icon: Icons.receipt_long_outlined,
                           text: _t('الفواتير', 'Invoices'),
                           active: true,
+                          fontWeightLevel: cfg.fontWeightLevel,
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
                               MaterialPageRoute(
@@ -645,21 +792,22 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         _SideItem(
                           icon: Icons.bar_chart_outlined,
                           text: _t('التقارير', 'Reports'),
+                          fontWeightLevel: cfg.fontWeightLevel,
                           onPressed: () => _showMsg(
                             _t('التقارير قيد التطوير', 'Reports feature is coming soon'),
                           ),
                         ),
                         _SideItem(
                           icon: Icons.settings_outlined,
-                          text: _t('الإعدادات', 'Settings'),
-                          onPressed: () => _showMsg(
-                            _t('الإعدادات قيد التطوير', 'Settings feature is coming soon'),
-                          ),
+                          text: _t('إدارة التصميم', 'Design Manager'),
+                          fontWeightLevel: cfg.fontWeightLevel,
+                          onPressed: _openDesignSettings,
                         ),
                         const Spacer(),
                         _SideItem(
                           icon: Icons.logout,
                           text: _t('تسجيل الخروج', 'Sign Out'),
+                          fontWeightLevel: cfg.fontWeightLevel,
                           onPressed: () =>
                               Navigator.of(context).popUntil((r) => r.isFirst),
                         ),
@@ -681,6 +829,8 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
               ],
             ),
           ),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Container(
               color: const Color(0xFFF8FAFC),
@@ -725,22 +875,57 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                               ],
                             ),
                           ),
-                          Wrap(
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                    child: Container(
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: tone(cfg.tableHeaderColor),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                    child: Align(
+                      alignment:
+                          _isArabic ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: [
                               _ActionBtn(
                                 icon: Icons.add,
                                 text: _t('إضافة معاملة', 'Add Transaction'),
-                                color: const Color(0xFF16A34A),
-                                hover: const Color(0xFF15803D),
+                                presetStyle: cfg.buttonPresetStyle,
+                                bgColor: addBtnColor,
+                                textColor: addBtnTextColor,
+                                borderColor: cfg.buttonBorderColor,
+                                borderWidth: cfg.buttonBorderWidth,
+                                radius: buttonRadius,
+                                shadowBlur: cfg.buttonShadowBlur,
+                                shadowOpacity: cfg.buttonShadowOpacity,
+                                shine: cfg.buttonShine,
+                                fontWeightLevel: cfg.fontWeightLevel,
                                 onPressed: _openAddTransaction,
                               ),
                               _ActionBtn(
                                 icon: Icons.edit,
                                 text: _t('تعديل معاملة', 'Edit Transaction'),
-                                color: const Color(0xFF2563EB),
-                                hover: const Color(0xFF1D4ED8),
+                                presetStyle: cfg.buttonPresetStyle,
+                                bgColor: editBtnColor,
+                                textColor: editBtnTextColor,
+                                borderColor: cfg.buttonBorderColor,
+                                borderWidth: cfg.buttonBorderWidth,
+                                radius: buttonRadius,
+                                shadowBlur: cfg.buttonShadowBlur,
+                                shadowOpacity: cfg.buttonShadowOpacity,
+                                shine: cfg.buttonShine,
+                                fontWeightLevel: cfg.fontWeightLevel,
                                 onPressed: _openEditTransaction,
                               ),
                               OutlinedButton.icon(
@@ -748,23 +933,33 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                 icon: const Icon(Icons.delete_outline, size: 16),
                                 label: Text(_t('حذف معاملة', 'Delete Transaction')),
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0x4DEF4444)),
-                                  foregroundColor: const Color(0xFFEF4444),
+                                  side: BorderSide(
+                                    color: cfg.buttonBorderColor,
+                                    width: cfg.buttonBorderWidth,
+                                  ),
+                                  foregroundColor: deleteBtnTextColor,
+                                  backgroundColor: deleteBtnColor,
                                   minimumSize: const Size(0, 36),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(buttonRadius),
                                   ),
                                 ),
                               ),
                               _ActionBtn(
-                                icon: Icons.check_circle_outline,
-                                text: _t('الحالة', 'Status'),
-                                color: const Color(0xFFF59E0B),
-                                hover: const Color(0xFFD97706),
-                                onPressed: _openStatusDialog,
-                              ),
-                            ],
-                          ),
+                                  icon: Icons.check_circle_outline,
+                                  text: _t('الحالة', 'Status'),
+                                  presetStyle: cfg.buttonPresetStyle,
+                                  bgColor: statusBtnColor,
+                                  textColor: statusBtnTextColor,
+                                  borderColor: cfg.buttonBorderColor,
+                                  borderWidth: cfg.buttonBorderWidth,
+                                  radius: buttonRadius,
+                                  shadowBlur: cfg.buttonShadowBlur,
+                                  shadowOpacity: cfg.buttonShadowOpacity,
+                                  shine: cfg.buttonShine,
+                                  fontWeightLevel: cfg.fontWeightLevel,
+                                  onPressed: _openStatusDialog,
+                                ),
                         ],
                       ),
                     ),
@@ -775,13 +970,13 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 24),
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF2B6CB0),
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                        boxShadow: [
+                      decoration: BoxDecoration(
+                        color: tone(cfg.tableHeaderColor),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        boxShadow: const [
                           BoxShadow(
-                            color: Color(0x33000000),
-                            blurRadius: 8,
+                              color: Color(0x33000000),
+                              blurRadius: 8,
                             offset: Offset(0, 2),
                           )
                         ],
@@ -790,17 +985,20 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         textDirection: tableDirection,
                         child: Row(
                           children: [
-                            _HeaderCell(_t('بند الخدمة', 'Service'), 2.5),
+                            _HeaderCell(_t('بند الخدمة', 'Service'), 2.5,
+                                textColor: headerTextColor),
                             _HeaderCell(_t('العدد', 'Qty'), 0.8,
-                                align: TextAlign.center),
+                                align: TextAlign.center, textColor: headerTextColor),
                             _HeaderCell(_t('سعر الوحدة', 'Unit Price'), 1.1,
-                                align: TextAlign.center),
+                                align: TextAlign.center, textColor: headerTextColor),
                             _HeaderCell(_t('الإجمالي', 'Total'), 1.2,
-                                align: TextAlign.center),
-                            _HeaderCell(_t('اسم الشركة', 'Company'), 1.8),
-                            _HeaderCell(_t('اسم الموظف', 'Employee'), 1.3),
-                            _HeaderCell(_t('المرفقات', 'Files'), 1.8,
-                                align: TextAlign.center),
+                                align: TextAlign.center, textColor: headerTextColor),
+                            _HeaderCell(_t('اسم الشركة', 'Company'), 1.8,
+                                textColor: headerTextColor),
+                            _HeaderCell(_t('اسم الموظف', 'Employee'), 1.3,
+                                textColor: headerTextColor),
+                            _HeaderCell(_t('المرفقات', 'Files'), 2.4,
+                                align: TextAlign.center, textColor: headerTextColor),
                           ],
                         ),
                       ),
@@ -812,14 +1010,14 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         : Container(
                       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: tone(cfg.tableAreaColor),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                         borderRadius:
                             const BorderRadius.vertical(bottom: Radius.circular(12)),
                         boxShadow: const [
                           BoxShadow(
-                            color: Color(0x26000000),
-                            blurRadius: 10,
+                              color: Color(0x26000000),
+                              blurRadius: 10,
                             offset: Offset(0, 4),
                           )
                         ],
@@ -839,77 +1037,109 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                               _selectedInvoices.contains(tx.invoiceNumber);
                           final isDelivered = tx.status == 'تم التسليم';
 
-                          return Column(
+                          return Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              10,
+                              cfg.cardSpacing,
+                              10,
+                              cfg.cardSpacing,
+                            ),
+                            child: Stack(
                             children: [
-                              Stack(
-                                children: [
                                   Container(
-                                      decoration: BoxDecoration(
+                                      clipBehavior: Clip.antiAlias,
+                                  decoration: BoxDecoration(
+                                        color: tone(cfg.transactionCardColor),
                                         border: Border.all(
-                                          color: isSelected
-                                              ? const Color(0xFF2563EB)
-                                              : Colors.transparent,
-                                          width: 2,
+                                      color: isSelected
+                                          ? const Color(0xFF2563EB)
+                                          : const Color(0xFFA5C8F4),
+                                          width: isSelected
+                                              ? cfg.cardBorderWidth + 0.6
+                                              : cfg.cardBorderWidth,
                                         ),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          for (int i = 0; i < tx.items.length; i++)
-                                            Container(
-                                              color: i.isEven
-                                                  ? Colors.white
-                                                  : const Color(0xFFF8FAFC),
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 18,
-                                                vertical: 12,
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x140F172A),
+                                            blurRadius: 10,
+                                            offset: Offset(0, 3),
+                                          ),
+                                        ],
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      for (int i = 0; i < tx.items.length; i++)
+                                        Container(
+                                          color: i.isEven
+                                              ? Colors.white
+                                                  : tone(cfg.tableAreaColor).withOpacity(0.32),
+                                              padding: EdgeInsets.symmetric(
+                                            horizontal: 18,
+                                                vertical: cfg.rowVerticalPadding,
                                               ),
-                                              child: Directionality(
-                                                textDirection: tableDirection,
-                                                child: Row(
-                                                  children: [
-                                                    _BodyCell(
-                                                      _isArabic
-                                                          ? tx.items[i].serviceAr
-                                                          : tx.items[i].serviceEn,
-                                                      2.5,
-                                                      weight: FontWeight.w500,
-                                                    ),
-                                                    _BodyCell(
+                                              constraints: BoxConstraints(
+                                                minHeight: cfg.transactionRowHeight,
+                                          ),
+                                          child: Directionality(
+                                            textDirection: tableDirection,
+                                            child: Row(
+                                              children: [
+                                                _BodyCell(
+                                                  _isArabic
+                                                      ? tx.items[i].serviceAr
+                                                      : tx.items[i].serviceEn,
+                                                  2.5,
+                                                  weight: FontWeight.w500,
+                                                  fontSize: cfg.baseFontSize,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _BodyCell(
                                                       '${tx.items[i].qty}',
                                                       0.8,
                                                       align: TextAlign.center,
-                                                    ),
-                                                    _BodyCell(
-                                                      tx.items[i].unitPrice
-                                                          .toStringAsFixed(2),
-                                                      1.1,
-                                                      align: TextAlign.center,
-                                                    ),
-                                                    _BodyCell(
-                                                      tx.items[i].total
-                                                          .toStringAsFixed(2),
-                                                      1.2,
-                                                      align: TextAlign.center,
-                                                      weight: FontWeight.w600,
-                                                    ),
-                                                    _BodyCell(
-                                                      _isArabic
-                                                          ? tx.items[i].companyAr
-                                                          : tx.items[i].companyEn,
-                                                      1.8,
-                                                      color: const Color(0xFF1E5A8A),
-                                                      weight: FontWeight.w500,
-                                                    ),
-                                                    _BodyCell(
-                                                      _isArabic
-                                                          ? tx.items[i].employeeAr
-                                                          : tx.items[i].employeeEn,
-                                                      1.3,
-                                                      color: const Color(0xFF7C3AED),
-                                                      weight: FontWeight.w500,
-                                                    ),
-                                                    Expanded(
-                                                      flex: 18,
+                                                  fontSize: cfg.baseFontSize,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _BodyCell(
+                                                    tx.items[i].unitPrice
+                                                        .toStringAsFixed(2),
+                                                    1.1,
+                                                  align: TextAlign.center,
+                                                  fontSize: cfg.baseFontSize,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _BodyCell(
+                                                  tx.items[i].total
+                                                      .toStringAsFixed(2),
+                                                  1.2,
+                                                  align: TextAlign.center,
+                                                  weight: FontWeight.w600,
+                                                  fontSize: cfg.baseFontSize,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _BodyCell(
+                                                  _isArabic
+                                                      ? tx.items[i].companyAr
+                                                      : tx.items[i].companyEn,
+                                                  1.8,
+                                                  color: const Color(0xFF1E5A8A),
+                                                  weight: FontWeight.w500,
+                                                  fontSize: cfg.baseFontSize,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _BodyCell(
+                                                  _isArabic
+                                                      ? tx.items[i].employeeAr
+                                                      : tx.items[i].employeeEn,
+                                                  1.3,
+                                                  color: const Color(0xFF7C3AED),
+                                                  weight: FontWeight.w500,
+                                                  fontSize: cfg.baseFontSize,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                Expanded(
+                                                      flex: 24,
                                                       child: Align(
                                                         alignment: Alignment.center,
                                                         child: Padding(
@@ -919,148 +1149,96 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                             horizontal: 4,
                                                           ),
                                                           child: _AttachmentIcons(
-                                                            attachmentPaths:
+                                                            attachments:
                                                                 tx.items[i]
-                                                                    .attachmentPaths,
+                                                                    .attachments,
+                                                            iconSize:
+                                                                cfg.attachmentIconSize,
                                                             onTapFile: (index) =>
                                                                 _onAttachmentIconTap(
                                                               tx.items[i]
                                                                   .attachmentPaths,
                                                               index,
                                                             ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          Container(
-                                            width: double.infinity,
-                                            color: const Color(0xFFDBEAFE),
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 10),
-                                            child: Center(
-                                              child: Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 16,
-                                                  vertical: 8,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFEFF6FF),
-                                                  border: Border.all(
-                                                    color: const Color(0x332563EB),
-                                                  ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                child: Wrap(
-                                                  crossAxisAlignment:
-                                                      WrapCrossAlignment.center,
-                                                  spacing: 10,
-                                                  runSpacing: 4,
-                                                  children: [
-                                                    Row(
-                                                      mainAxisSize: MainAxisSize.min,
-                                                      children: [
-                                                        Checkbox(
-                                                          value: isSelected,
-                                                          activeColor:
-                                                              const Color(0xFF2563EB),
-                                                          onChanged: (_) =>
-                                                              _toggleSelection(
-                                                            tx.invoiceNumber,
-                                                          ),
-                                                        ),
-                                                        Text(
-                                                          _t('تحديد', 'Select'),
-                                                          style: const TextStyle(
-                                                            fontSize: 12,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color:
-                                                                Color(0xFF334155),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const _Sep(),
-                                                    _InfoText(
-                                                      '${_t('فاتورة:', 'Invoice:')} ${tx.invoiceNumber}',
-                                                      valueColor:
-                                                          const Color(0xFF2563EB),
-                                                    ),
-                                                    const _Sep(),
-                                                    _InfoText(
-                                                      '${_t('التاريخ:', 'Date:')} ${tx.date}',
-                                                    ),
-                                                    const _Sep(),
-                                                    RichText(
-                                                      text: TextSpan(
-                                                        style: const TextStyle(
-                                                          color: Colors.black,
-                                                          fontSize: 13,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                        ),
-                                                        children: [
-                                                          TextSpan(
-                                                            text:
-                                                                '${_t('الحالة:', 'Status:')} ',
-                                                          ),
-                                                          WidgetSpan(
-                                                            alignment:
-                                                                PlaceholderAlignment
-                                                                    .middle,
-                                                            child: Container(
-                                                              padding:
-                                                                  const EdgeInsets
-                                                                      .symmetric(
-                                                                horizontal: 8,
-                                                                vertical: 2,
-                                                              ),
-                                                              decoration:
-                                                                  BoxDecoration(
-                                                                color: _statusColor(
-                                                                    tx.status),
-                                                                borderRadius:
-                                                                    BorderRadius
-                                                                        .circular(
-                                                                            6),
-                                                              ),
-                                                              child: Text(
-                                                                _statusLabel(
-                                                                    tx.status),
-                                                                style:
-                                                                    const TextStyle(
-                                                                  fontSize: 11,
-                                                                  color:
-                                                                      Colors.white,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .w600,
-                                                                ),
-                                                              ),
+                                                            onDeleteFile: (index) =>
+                                                                _deleteSingleAttachment(
+                                                              tx.items[i]
+                                                                  .attachments[index],
+                                                            ),
                                                             ),
                                                           ),
-                                                        ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                          Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 8,
+                                            ),
+                                            child: Wrap(
+                                              crossAxisAlignment:
+                                                  WrapCrossAlignment.center,
+                                              spacing: 8,
+                                              runSpacing: 2,
+                                              children: [
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Checkbox(
+                                                      value: isSelected,
+                                                      activeColor:
+                                                          const Color(0xFFBFDBFE),
+                                                      checkColor:
+                                                          const Color(0xFF1E3A8A),
+                                                      onChanged: (_) =>
+                                                          _toggleSelection(
+                                                        tx.invoiceNumber,
                                                       ),
                                                     ),
-                                                    const _Sep(),
-                                                    _InfoText(
-                                                      '${_t('الإجمالي:', 'Total:')} AED ${tx.grandTotal.toStringAsFixed(2)}',
-                                                      valueColor:
-                                                          const Color(0xFF2563EB),
+                                                    Text(
+                                                      _t('تحديد', 'Select'),
+                                                      style: TextStyle(
+                                                        fontSize: cfg.baseFontSize - 3,
+                                                      fontWeight:
+                                                            FontWeight.w600,
+                                                        color: onCardTextColor,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
-                                              ),
+                                                _CompactInfoText(
+                                                  '${_t('فاتورة:', 'Invoice:')} ${tx.invoiceNumber}',
+                                                  valueColor: onCardTextColor,
+                                                  baseColor: onCardTextColor,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _CompactInfoText(
+                                                  '${_t('التاريخ:', 'Date:')} ${tx.date}',
+                                                  baseColor: onCardTextColor,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _CompactInfoText(
+                                                  '${_t('الحالة:', 'Status:')} ${_statusLabel(tx.status)}',
+                                                  valueColor:
+                                                      _statusColor(tx.status),
+                                                  baseColor: onCardTextColor,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                ),
+                                                _CompactInfoText(
+                                                  '${_t('الإجمالي:', 'Total:')} AED ${tx.grandTotal.toStringAsFixed(2)}',
+                                                  valueColor: onCardTextColor,
+                                                  baseColor: onCardTextColor,
+                                                  fontWeightLevel: cfg.fontWeightLevel,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ),
                                   if (isDelivered)
                                     Positioned.fill(
                                       child: IgnorePointer(
@@ -1075,15 +1253,12 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                 color: Color(0x22000000),
                                               ),
                                             ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                                  ),
+                                ),
                               ),
-                              if (txIndex < data.length - 1)
-                                Container(height: 3, color: const Color(0x332563EB)),
+                                    ),
                             ],
+                              ),
                           );
                         },
                       ),
@@ -1095,6 +1270,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
           ),
         ],
       ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1128,7 +1306,15 @@ class _TxRecord {
               companyEn: tx.company,
               employeeAr: tx.employee,
               employeeEn: tx.employee,
-              attachmentPaths: it.attachmentPaths,
+              attachments: it.attachments
+                  .map(
+                    (a) => _TxAttachment(
+                      id: a.id,
+                      fileName: a.fileName,
+                      filePath: a.filePath,
+                    ),
+                  )
+                  .toList(),
             ),
           )
           .toList(),
@@ -1196,7 +1382,7 @@ class _TxItem {
     required this.companyEn,
     required this.employeeAr,
     required this.employeeEn,
-    required this.attachmentPaths,
+    required this.attachments,
   });
 
   final String serviceAr;
@@ -1210,9 +1396,23 @@ class _TxItem {
   final String companyEn;
   final String employeeAr;
   final String employeeEn;
-  final List<String> attachmentPaths;
+  final List<_TxAttachment> attachments;
+  List<String> get attachmentPaths =>
+      attachments.map((a) => a.filePath).toList(growable: false);
   int get attachmentCount => attachmentPaths.length;
   bool get hasAttachment => attachmentPaths.isNotEmpty;
+}
+
+class _TxAttachment {
+  const _TxAttachment({
+    required this.id,
+    required this.fileName,
+    required this.filePath,
+  });
+
+  final int? id;
+  final String fileName;
+  final String filePath;
 }
 
 class _SideItem extends StatelessWidget {
@@ -1220,32 +1420,55 @@ class _SideItem extends StatelessWidget {
     required this.icon,
     required this.text,
     this.active = false,
+    this.fontWeightLevel = 500,
     this.onPressed,
   });
 
   final IconData icon;
   final String text;
   final bool active;
+  final double fontWeightLevel;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final cfg = DesignController.instance.config;
+    final controller = DesignController.instance;
+    final buttonRadius = switch (cfg.buttonShapeStyle) {
+      1 => 999.0,
+      2 => 2.0,
+      3 => 14.0,
+      _ => cfg.buttonRadius,
+    };
+    final bg = active
+        ? controller.shiftColor(cfg.buttonBgColor, cfg.uiBrightnessShift)
+        : Colors.transparent;
+    final fg = active ? cfg.buttonTextColor : const Color(0xFFB0CDE4);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: TextButton.icon(
         onPressed: onPressed ?? () {},
         style: TextButton.styleFrom(
-          backgroundColor:
-              active ? const Color(0xFF2563EB) : Colors.transparent,
-          foregroundColor: active ? Colors.white : const Color(0xFFB0CDE4),
+          backgroundColor: bg,
+          foregroundColor: fg,
+          side: BorderSide(
+            color: active ? cfg.buttonBorderColor : Colors.transparent,
+            width: cfg.buttonBorderWidth,
+          ),
           minimumSize: const Size(double.infinity, 40),
           alignment: Alignment.centerLeft,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(buttonRadius),
+          ),
         ),
         icon: Icon(icon, size: 18),
         label: Text(
           text,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: _shiftWeight(FontWeight.w500, fontWeightLevel),
+            color: fg,
+          ),
         ),
       ),
     );
@@ -1256,41 +1479,111 @@ class _ActionBtn extends StatelessWidget {
   const _ActionBtn({
     required this.icon,
     required this.text,
-    required this.color,
-    required this.hover,
+    required this.presetStyle,
+    required this.bgColor,
+    required this.textColor,
+    required this.borderColor,
+    required this.borderWidth,
+    required this.radius,
+    required this.shadowBlur,
+    required this.shadowOpacity,
+    required this.shine,
+    required this.fontWeightLevel,
     this.onPressed,
   });
 
   final IconData icon;
   final String text;
-  final Color color;
-  final Color hover;
+  final int presetStyle;
+  final Color bgColor;
+  final Color textColor;
+  final Color borderColor;
+  final double borderWidth;
+  final double radius;
+  final double shadowBlur;
+  final double shadowOpacity;
+  final double shine;
+  final double fontWeightLevel;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: onPressed ?? () {},
-      icon: Icon(icon, size: 16),
-      label: Text(text),
-      style: TextButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        minimumSize: const Size(0, 36),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ).copyWith(
-        overlayColor: WidgetStatePropertyAll(hover.withOpacity(0.2)),
+    final top = HSLColor.fromColor(bgColor)
+        .withLightness((HSLColor.fromColor(bgColor).lightness + (shine * 0.18))
+            .clamp(0.0, 1.0))
+        .toColor();
+    final soft = HSLColor.fromColor(bgColor)
+        .withLightness((HSLColor.fromColor(bgColor).lightness + 0.16).clamp(0.0, 1.0))
+        .toColor();
+    final glass = Colors.white.withOpacity(0.22);
+    final isMinimal = presetStyle == 4;
+    final isSoft = presetStyle == 3;
+    final isGlass = presetStyle == 2;
+    final isGradient = presetStyle == 1;
+    final gradientColors = isGradient
+        ? [top, bgColor]
+        : isGlass
+            ? [glass, bgColor.withOpacity(0.75)]
+            : isSoft
+                ? [soft, bgColor]
+                : [bgColor, bgColor];
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(isMinimal ? 4 : radius),
+        boxShadow: (shadowBlur <= 0 || isMinimal)
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(shadowOpacity),
+                  blurRadius: shadowBlur,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: isGradient || isGlass || isSoft
+              ? gradientColors
+              : (shine > 0 ? [top, bgColor] : [bgColor, bgColor]),
+        ),
+      ),
+      child: TextButton.icon(
+        onPressed: onPressed ?? () {},
+        icon: Icon(icon, size: 16),
+        label: Text(
+          text,
+          style: TextStyle(
+            fontWeight: _shiftWeight(FontWeight.w600, fontWeightLevel),
+          ),
+        ),
+        style: TextButton.styleFrom(
+          foregroundColor: isSoft ? Colors.black87 : textColor,
+          minimumSize: const Size(0, 36),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isMinimal ? 4 : radius),
+            side: BorderSide(
+              color: isMinimal ? textColor.withOpacity(0.25) : borderColor,
+              width: isMinimal ? 1 : borderWidth,
+            ),
+          ),
+        ).copyWith(
+          backgroundColor: WidgetStatePropertyAll(
+              isMinimal ? Colors.transparent : Colors.transparent),
+          overlayColor: WidgetStatePropertyAll(textColor.withOpacity(0.12)),
+        ),
       ),
     );
   }
 }
 
 class _HeaderCell extends StatelessWidget {
-  const _HeaderCell(this.text, this.flex, {this.align = TextAlign.start});
+  const _HeaderCell(this.text, this.flex,
+      {this.align = TextAlign.start, this.textColor = Colors.white});
 
   final String text;
   final double flex;
   final TextAlign align;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1299,8 +1592,8 @@ class _HeaderCell extends StatelessWidget {
       child: Text(
         text,
         textAlign: align,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: textColor,
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
@@ -1316,6 +1609,8 @@ class _BodyCell extends StatelessWidget {
     this.align = TextAlign.start,
     this.color = Colors.black,
     this.weight = FontWeight.w400,
+    this.fontSize = 15,
+    this.fontWeightLevel = 500,
   });
 
   final String text;
@@ -1323,6 +1618,8 @@ class _BodyCell extends StatelessWidget {
   final TextAlign align;
   final Color color;
   final FontWeight weight;
+  final double fontSize;
+  final double fontWeightLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -1333,7 +1630,11 @@ class _BodyCell extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         textAlign: align,
-        style: TextStyle(color: color, fontSize: 15, fontWeight: weight),
+        style: TextStyle(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: _shiftWeight(weight, fontWeightLevel),
+        ),
       ),
     );
   }
@@ -1341,78 +1642,93 @@ class _BodyCell extends StatelessWidget {
 
 class _AttachmentIcons extends StatelessWidget {
   const _AttachmentIcons({
-    required this.attachmentPaths,
+    required this.attachments,
+    required this.iconSize,
     required this.onTapFile,
+    required this.onDeleteFile,
   });
 
-  final List<String> attachmentPaths;
+  final List<_TxAttachment> attachments;
+  final double iconSize;
   final ValueChanged<int> onTapFile;
+  final ValueChanged<int> onDeleteFile;
 
   @override
   Widget build(BuildContext context) {
-    final validPaths = attachmentPaths.where((e) => e.trim().isNotEmpty).toList();
-    if (validPaths.isEmpty) {
+    final valid = attachments
+        .where((e) => e.filePath.trim().isNotEmpty)
+        .toList(growable: false);
+    if (valid.isEmpty) {
       return const Text(
         '-',
         style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final hasFiniteWidth = constraints.maxWidth.isFinite;
-        final availableWidth = hasFiniteWidth ? constraints.maxWidth : 360.0;
-        final chipWidth = (availableWidth - 12) / 3;
-
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          alignment: WrapAlignment.center,
-          children: [
-            for (int i = 0; i < validPaths.length; i++)
-              SizedBox(
-                width: chipWidth > 84 ? chipWidth : 84,
-                child: ActionChip(
-                  onPressed: () => onTapFile(i),
-                  avatar: const Icon(
-                    Icons.attach_file,
-                    size: 14,
-                    color: Color(0xFF2563EB),
-                  ),
-                  label: Text(
-                    p.basename(validPaths[i]),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < valid.length; i++) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  InkWell(
+                    onTap: () => onTapFile(i),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(1),
+                      child: Icon(
+                        Icons.attach_file,
+                        size: iconSize,
+                        color: const Color(0xFFB91C1C),
+                      ),
                     ),
                   ),
-                  backgroundColor: const Color(0xFFEFF6FF),
-                  side: const BorderSide(color: Color(0xFFBFDBFE)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  const SizedBox(width: 2),
+                  InkWell(
+                    onTap: () => onDeleteFile(i),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(1),
+                      child: Icon(
+                        Icons.close,
+                        size: ((iconSize - 1).clamp(8, 24)).toDouble(),
+                        color: const Color(0xFFB91C1C),
+                      ),
+                    ),
                   ),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity:
-                      const VisualDensity(horizontal: -2, vertical: -2),
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                ),
+                ],
               ),
+            ),
+            if (i != valid.length - 1) const SizedBox(width: 6),
           ],
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
-class _InfoText extends StatelessWidget {
-  const _InfoText(this.text, {this.valueColor = Colors.black});
+class _CompactInfoText extends StatelessWidget {
+  const _CompactInfoText(
+    this.text, {
+    this.valueColor = const Color(0xFFE2ECFA),
+    this.baseColor = const Color(0xFFE2ECFA),
+    this.fontWeightLevel = 500,
+  });
 
   final String text;
   final Color valueColor;
+  final Color baseColor;
+  final double fontWeightLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -1422,16 +1738,19 @@ class _InfoText extends StatelessWidget {
 
     return RichText(
       text: TextSpan(
-        style: const TextStyle(
-          fontSize: 13,
-          color: Colors.black,
-          fontWeight: FontWeight.w500,
+        style: TextStyle(
+          fontSize: 11.5,
+          color: baseColor,
+          fontWeight: _shiftWeight(FontWeight.w500, fontWeightLevel),
         ),
         children: [
           TextSpan(text: '$label '),
           TextSpan(
             text: value,
-            style: TextStyle(color: valueColor, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: valueColor,
+              fontWeight: _shiftWeight(FontWeight.w600, fontWeightLevel),
+            ),
           ),
         ],
       ),
@@ -1439,11 +1758,52 @@ class _InfoText extends StatelessWidget {
   }
 }
 
-class _Sep extends StatelessWidget {
-  const _Sep();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 14, color: const Color(0xFFCBD5E1));
+FontWeight _shiftWeight(FontWeight base, double weightLevel) {
+  const weights = <FontWeight>[
+    FontWeight.w100,
+    FontWeight.w200,
+    FontWeight.w300,
+    FontWeight.w400,
+    FontWeight.w500,
+    FontWeight.w600,
+    FontWeight.w700,
+    FontWeight.w800,
+    FontWeight.w900,
+  ];
+  int baseIdx = 4;
+  switch (base) {
+    case FontWeight.w100:
+      baseIdx = 0;
+      break;
+    case FontWeight.w200:
+      baseIdx = 1;
+      break;
+    case FontWeight.w300:
+      baseIdx = 2;
+      break;
+    case FontWeight.w400:
+      baseIdx = 3;
+      break;
+    case FontWeight.w500:
+      baseIdx = 4;
+      break;
+    case FontWeight.w600:
+      baseIdx = 5;
+      break;
+    case FontWeight.w700:
+      baseIdx = 6;
+      break;
+    case FontWeight.w800:
+      baseIdx = 7;
+      break;
+    case FontWeight.w900:
+      baseIdx = 8;
+      break;
+    default:
+      baseIdx = 4;
   }
+  final delta = ((weightLevel - 500) / 100).round();
+  final idx = (baseIdx + delta).clamp(0, 8);
+  return weights[idx];
 }
+
