@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../logic/customer_transactions_logic.dart';
 import 'customer_transactions_page.dart';
+import 'invoice3_summary_page.dart';
 import 'invoice_print_page.dart';
+import 'design_settings_page.dart';
 import 'login_page.dart';
 
 class InvoicesPage extends StatefulWidget {
@@ -65,6 +67,25 @@ class _InvoicesPageState extends State<InvoicesPage> {
       return const Color(0xFFDC2626);
     }
     return const Color(0xFFD97706);
+  }
+
+  void _openInvoice3() {
+    final selected = _selectedRows
+        .where((i) => i >= 0 && i < _logic.transactions.length)
+        .map((i) => _logic.transactions[i])
+        .toList();
+    final source = selected.isEmpty ? _logic.transactions : selected;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Invoice3SummaryPage(
+          isArabic: _isArabic,
+          customerNameAr: widget.customerNameAr,
+          customerNameEn: widget.customerNameEn,
+          transactions: source,
+        ),
+      ),
+    );
   }
 
   @override
@@ -254,6 +275,28 @@ class _InvoicesPageState extends State<InvoicesPage> {
                                 _TopActionButton(
                                   label: _t('فاتورة 2', 'Invoice 2'),
                                   color: const Color(0xFF0891B2),
+                                ),
+                                _TopActionButton(
+                                  label: _t('فاتورة 3', 'Invoice 3'),
+                                  color: const Color(0xFF64748B),
+                                  onPressed: _openInvoice3,
+                                ),
+                                _TopActionButton(
+                                  label: _t('إدارة التصميم', 'Design Settings'),
+                                  color: const Color(0xFF7C3AED),
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      PageRouteBuilder<bool>(
+                                        opaque: false,
+                                        barrierColor: const Color(0x22000000),
+                                        pageBuilder: (_, __, ___) =>
+                                            DesignSettingsPage(
+                                          isArabic: _isArabic,
+                                          asOverlay: true,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),

@@ -30,6 +30,10 @@ class AppDesignConfig {
     required this.actionStatusButtonColor,
     required this.fontFamilyName,
     required this.fontWeightLevel,
+    required this.invoicePrimaryColor,
+    required this.invoiceSecondaryColor,
+    required this.invoiceAccentColor,
+    required this.invoiceTextColor,
   });
 
   final Color tableHeaderColor;
@@ -60,6 +64,10 @@ class AppDesignConfig {
   final Color actionStatusButtonColor;
   final String fontFamilyName;
   final double fontWeightLevel;
+  final Color invoicePrimaryColor;
+  final Color invoiceSecondaryColor;
+  final Color invoiceAccentColor;
+  final Color invoiceTextColor;
 
   static const AppDesignConfig defaults = AppDesignConfig(
     tableHeaderColor: Color(0xFF1E293B),
@@ -90,6 +98,10 @@ class AppDesignConfig {
     actionStatusButtonColor: Color(0xFFF59E0B),
     fontFamilyName: 'Inter',
     fontWeightLevel: 500,
+    invoicePrimaryColor: Color(0xFF8E9FB1),
+    invoiceSecondaryColor: Color(0xFFE9EDF2),
+    invoiceAccentColor: Color(0xFF6F8297),
+    invoiceTextColor: Color(0xFF243241),
   );
 
   AppDesignConfig copyWith({
@@ -121,6 +133,10 @@ class AppDesignConfig {
     Color? actionStatusButtonColor,
     String? fontFamilyName,
     double? fontWeightLevel,
+    Color? invoicePrimaryColor,
+    Color? invoiceSecondaryColor,
+    Color? invoiceAccentColor,
+    Color? invoiceTextColor,
   }) {
     return AppDesignConfig(
       tableHeaderColor: tableHeaderColor ?? this.tableHeaderColor,
@@ -152,6 +168,10 @@ class AppDesignConfig {
       actionStatusButtonColor: actionStatusButtonColor ?? this.actionStatusButtonColor,
       fontFamilyName: fontFamilyName ?? this.fontFamilyName,
       fontWeightLevel: _clamp(fontWeightLevel ?? this.fontWeightLevel, 300, 800),
+      invoicePrimaryColor: invoicePrimaryColor ?? this.invoicePrimaryColor,
+      invoiceSecondaryColor: invoiceSecondaryColor ?? this.invoiceSecondaryColor,
+      invoiceAccentColor: invoiceAccentColor ?? this.invoiceAccentColor,
+      invoiceTextColor: invoiceTextColor ?? this.invoiceTextColor,
     );
   }
 
@@ -185,6 +205,10 @@ class AppDesignConfig {
       'actionStatusButtonColor': actionStatusButtonColor.value,
       'fontFamilyName': fontFamilyName,
       'fontWeightLevel': fontWeightLevel,
+      'invoicePrimaryColor': invoicePrimaryColor.value,
+      'invoiceSecondaryColor': invoiceSecondaryColor.value,
+      'invoiceAccentColor': invoiceAccentColor.value,
+      'invoiceTextColor': invoiceTextColor.value,
     };
   }
 
@@ -243,6 +267,14 @@ class AppDesignConfig {
           : defaults.fontFamilyName,
       fontWeightLevel:
           _doubleOrDefault(json['fontWeightLevel'], defaults.fontWeightLevel),
+      invoicePrimaryColor:
+          _colorOrDefault(json['invoicePrimaryColor'], defaults.invoicePrimaryColor),
+      invoiceSecondaryColor:
+          _colorOrDefault(json['invoiceSecondaryColor'], defaults.invoiceSecondaryColor),
+      invoiceAccentColor:
+          _colorOrDefault(json['invoiceAccentColor'], defaults.invoiceAccentColor),
+      invoiceTextColor:
+          _colorOrDefault(json['invoiceTextColor'], defaults.invoiceTextColor),
     );
   }
 

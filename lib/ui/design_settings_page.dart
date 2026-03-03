@@ -301,6 +301,31 @@ class DesignSettingsPage extends StatelessWidget {
                 color: cfg.sidebarColor,
                 onPicked: (c) => controller.setSidebarColor(c),
               ),
+              _SectionTitle(_t('ألوان الفاتورة', 'Invoice Colors')),
+              _SectionHint(_t(
+                'هذه الألوان تتحكم في تصميم الفاتورة 3 بالكامل وتتحدث فورًا.',
+                'These colors control the full Invoice 3 appearance and update instantly.',
+              )),
+              _ColorTile(
+                label: _t('لون هيدر الجدول (الفاتورة)', 'Invoice table header color'),
+                color: cfg.invoicePrimaryColor,
+                onPicked: (c) => controller.setInvoicePrimaryColor(c),
+              ),
+              _ColorTile(
+                label: _t('لون الصفوف البديلة (الفاتورة)', 'Invoice alt row / stripe color'),
+                color: cfg.invoiceSecondaryColor,
+                onPicked: (c) => controller.setInvoiceSecondaryColor(c),
+              ),
+              _ColorTile(
+                label: _t('لون العنوان والزوايا (الفاتورة)', 'Invoice title / corner accent'),
+                color: cfg.invoiceAccentColor,
+                onPicked: (c) => controller.setInvoiceAccentColor(c),
+              ),
+              _ColorTile(
+                label: _t('لون النص الرئيسي (الفاتورة)', 'Invoice main text color'),
+                color: cfg.invoiceTextColor,
+                onPicked: (c) => controller.setInvoiceTextColor(c),
+              ),
               _SectionTitle(_t('الأزرار', 'Buttons')),
               _SectionHint(_t(
                 'هذه الإعدادات تؤثر على أزرار الإجراءات في الصفحة.',

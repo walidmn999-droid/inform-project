@@ -193,6 +193,14 @@ class DesignController extends ChangeNotifier {
       _previewUpdate(_config.copyWith(fontFamilyName: value));
   Future<void> setFontWeightLevel(double value) =>
       _previewUpdate(_config.copyWith(fontWeightLevel: value));
+  Future<void> setInvoicePrimaryColor(Color value) =>
+      _previewUpdate(_config.copyWith(invoicePrimaryColor: value));
+  Future<void> setInvoiceSecondaryColor(Color value) =>
+      _previewUpdate(_config.copyWith(invoiceSecondaryColor: value));
+  Future<void> setInvoiceAccentColor(Color value) =>
+      _previewUpdate(_config.copyWith(invoiceAccentColor: value));
+  Future<void> setInvoiceTextColor(Color value) =>
+      _previewUpdate(_config.copyWith(invoiceTextColor: value));
 
   Future<List<SavedDesignTheme>> getSavedThemes() async {
     final list = await _loadSavedThemes();
