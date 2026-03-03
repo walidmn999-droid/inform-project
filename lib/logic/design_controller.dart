@@ -124,6 +124,7 @@ class DesignController extends ChangeNotifier {
       _previewUpdate(_config.copyWith(fontWeightLevel: value));
 
   static const List<String> paletteIds = <String>[
+    'new_theme_linked',
     'linear_midnight',
     'arctic_neon',
     'ocean_glow',
@@ -132,6 +133,8 @@ class DesignController extends ChangeNotifier {
 
   static String paletteTitle(String id) {
     switch (id) {
+      case 'new_theme_linked':
+        return 'New Theme (Linked)';
       case 'linear_midnight':
         return 'Linear Midnight';
       case 'arctic_neon':
@@ -147,6 +150,36 @@ class DesignController extends ChangeNotifier {
 
   Future<void> applyPalettePreset(String id) {
     final next = switch (id) {
+      'new_theme_linked' => _config.copyWith(
+          tableHeaderColor: const Color(0xFF22345F),
+          tableAreaColor: const Color(0xFF21335E),
+          transactionCardColor: const Color(0xFFF3F5F9),
+          sidebarColor: const Color(0xFF22345F),
+          buttonBgColor: const Color(0xFF0C4A7C),
+          buttonTextColor: const Color(0xFFFFFFFF),
+          buttonBorderColor: const Color(0x994CC9F0),
+          actionAddButtonColor: const Color(0xFF0F766E),
+          actionEditButtonColor: const Color(0xFF0369A1),
+          actionDeleteButtonColor: const Color(0xFF7F1D1D),
+          actionStatusButtonColor: const Color(0xFFF59E0B),
+          transactionRowHeight: 48,
+          rowVerticalPadding: 10,
+          cardSpacing: 10,
+          cardBorderWidth: 1,
+          attachmentIconSize: 12,
+          baseFontSize: 14,
+          fontWeightLevel: 500,
+          uiBrightnessShift: 0,
+          buttonPresetStyle: 2,
+          buttonShapeStyle: 0,
+          buttonBorderWidth: 1,
+          buttonRadius: 8,
+          buttonShadowBlur: 14,
+          buttonShadowOpacity: 0.2,
+          buttonShine: 0.18,
+          useDistinctActionButtonColors: true,
+          fontFamilyName: 'Inter',
+        ),
       'arctic_neon' => _config.copyWith(
           tableHeaderColor: const Color(0xFF1E293B),
           tableAreaColor: const Color(0xFF0B1324),

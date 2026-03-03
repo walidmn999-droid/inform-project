@@ -21,15 +21,15 @@ class DesignSettingsPage extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final cfg = controller.config;
-        const panelBg = Color(0xFF0B1220);
-        const panelSurface = Color(0xFF131C2E);
-        const panelBorder = Color(0x334B5C7A);
-        const neonAccent = Color(0xFF22D3EE);
-        const neonAccentSoft = Color(0x6622D3EE);
+        const panelBg = Color(0xFFF4F8FC);
+        const panelSurface = Color(0xFFFFFFFF);
+        const panelBorder = Color(0x22315574);
+        const neonAccent = Color(0xFF0EA5E9);
+        const neonAccentSoft = Color(0x330EA5E9);
         final modernTheme = Theme.of(context).copyWith(
           scaffoldBackgroundColor: panelBg,
           cardTheme: CardTheme(
-            color: panelSurface.withOpacity(0.86),
+            color: panelSurface,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -42,27 +42,27 @@ class DesignSettingsPage extends StatelessWidget {
                 activeTrackColor: neonAccent,
                 thumbColor: neonAccent,
                 overlayColor: neonAccentSoft,
-                inactiveTrackColor: const Color(0xFF1F2C44),
+                inactiveTrackColor: const Color(0xFFD5E3F2),
               ),
           switchTheme: SwitchThemeData(
             thumbColor: WidgetStateProperty.resolveWith(
               (states) => states.contains(WidgetState.selected)
                   ? neonAccent
-                  : const Color(0xFF64748B),
+                  : const Color(0xFF94A3B8),
             ),
             trackColor: WidgetStateProperty.resolveWith(
               (states) => states.contains(WidgetState.selected)
                   ? neonAccentSoft
-                  : const Color(0x553B4E6A),
+                  : const Color(0x446B8AAD),
             ),
           ),
           filledButtonTheme: FilledButtonThemeData(
             style: FilledButton.styleFrom(
               backgroundColor: neonAccent,
-              foregroundColor: const Color(0xFF041320),
+              foregroundColor: const Color(0xFFFFFFFF),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: Color(0x6640E0FF), width: 1.1),
+                side: const BorderSide(color: Color(0x664A90D9), width: 1.1),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               textStyle: const TextStyle(
@@ -77,13 +77,13 @@ class DesignSettingsPage extends StatelessWidget {
           ),
           textTheme: Theme.of(context).textTheme.apply(
                 fontFamily: cfg.fontFamilyName,
-                bodyColor: const Color(0xFFE2E8F0),
-                displayColor: const Color(0xFFF8FAFC),
+                bodyColor: const Color(0xFF0F172A),
+                displayColor: const Color(0xFF0F172A),
               ).copyWith(
                 bodyMedium: const TextStyle(
                   letterSpacing: 0.15,
                   height: 1.45,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
                 titleMedium: const TextStyle(
                   letterSpacing: 0.1,
@@ -91,12 +91,32 @@ class DesignSettingsPage extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-          dividerColor: const Color(0x223B4E6A),
+          dividerColor: const Color(0x22315574),
         );
         final body = ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.info_outline, color: Color(0xFF22D3EE)),
+                  title: Text(
+                    _t('طريقة الاستخدام', 'How to use'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    _t(
+                      'كل تغيير هنا يظهر مباشرة كمعاينة. لن يتم الحفظ الدائم إلا بعد الضغط على "تطبيق".\nلإلغاء التغييرات الحالية اضغط "إلغاء".',
+                      'All changes here are live preview. Permanent save happens only after "Apply".\nUse "Cancel" to discard current changes.',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               _SectionTitle(_t('الأحجام', 'Sizing')),
+              _SectionHint(_t(
+                'هذه الإعدادات تتحكم في المقاسات والمسافات داخل جدول المعاملات.',
+                'These settings control dimensions and spacing inside the transactions table.',
+              )),
               _SliderTile(
                 label: _t('حجم أيقونة المرفقات', 'Attachment icon size'),
                 value: cfg.attachmentIconSize,
@@ -186,6 +206,14 @@ class DesignSettingsPage extends StatelessWidget {
                 onChanged: (v) => controller.setFontWeightLevel(v),
               ),
               _SectionTitle(_t('خيارات التصميم العامة', 'Global design options')),
+              _SectionHint(_t(
+                'تفتيح/تغميق سريع على كامل المظهر بدون تغيير القيم الأساسية.',
+                'Quick brighten/darken over the whole look without replacing your base values.',
+              )),
+              _BrightnessIndicator(
+                value: cfg.uiBrightnessShift,
+                isArabic: isArabic,
+              ),
               _SliderTile(
                 label: _t('تفتيح/تغميق التصميم', 'Lighten/Darken design'),
                 value: cfg.uiBrightnessShift,
@@ -195,6 +223,10 @@ class DesignSettingsPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _SectionTitle(_t('الألوان', 'Colors')),
+              _SectionHint(_t(
+                'اختر باليتة جاهزة أو عدّل كل لون يدويًا.',
+                'Choose a ready palette or customize each color manually.',
+              )),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -218,7 +250,10 @@ class DesignSettingsPage extends StatelessWidget {
                             ),
                           ),
                           child: Text(
-                            DesignController.paletteTitle(id),
+                            id == 'new_theme_linked'
+                                ? _t('نيو ثيم (مرتبط بزر السايدبار)',
+                                    'New Theme (linked to sidebar button)')
+                                : DesignController.paletteTitle(id),
                             style: const TextStyle(
                               letterSpacing: 0.2,
                               fontWeight: FontWeight.w600,
@@ -250,6 +285,80 @@ class DesignSettingsPage extends StatelessWidget {
                 onPicked: (c) => controller.setSidebarColor(c),
               ),
               _SectionTitle(_t('الأزرار', 'Buttons')),
+              _SectionHint(_t(
+                'هذه الإعدادات تؤثر على أزرار الإجراءات في الصفحة.',
+                'These settings affect action buttons on the page.',
+              )),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _t('خصائص التصميم الزجاجي', 'Glass design properties'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _t(
+                          'هذا القسم يعطي مظهر زجاجي (Glass) عبر الحدود والشفافية واللمعة، بدون إجبار أي تغيير دائم إلا عند تطبيق.',
+                          'This section creates a glass look via border, opacity and shine, with no permanent change until Apply.',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF475569),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () {
+                              controller.preview(
+                                cfg.copyWith(
+                                  buttonPresetStyle: 2,
+                                  buttonShapeStyle: 0,
+                                  buttonBorderWidth: 1.2,
+                                  buttonRadius: 10,
+                                  buttonShadowBlur: 18,
+                                  buttonShadowOpacity: 0.3,
+                                  buttonShine: 0.42,
+                                  buttonBorderColor: const Color(0x8893C5DB),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.auto_awesome),
+                            label: Text(_t('تفعيل مظهر زجاجي جاهز',
+                                'Apply ready glass look')),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              controller.preview(
+                                cfg.copyWith(
+                                  buttonPresetStyle: 0,
+                                  buttonShadowBlur: 8,
+                                  buttonShadowOpacity: 0.12,
+                                  buttonShine: 0.1,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.layers_clear),
+                            label: Text(_t('تقليل التأثير الزجاجي',
+                                'Reduce glass effect')),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               SwitchListTile(
                 title: Text(_t('تمييز ألوان أزرار الإجراءات', 'Distinct action button colors')),
                 value: cfg.useDistinctActionButtonColors,
@@ -326,21 +435,21 @@ class DesignSettingsPage extends StatelessWidget {
                 onChanged: (v) => controller.setButtonRadius(v),
               ),
               _SliderTile(
-                label: _t('قوة الظل', 'Button shadow blur'),
+                label: _t('قوة ضباب الزجاج (الظل)', 'Glass blur strength (shadow blur)'),
                 value: cfg.buttonShadowBlur,
                 min: 0,
                 max: 30,
                 onChanged: (v) => controller.setButtonShadowBlur(v),
               ),
               _SliderTile(
-                label: _t('شفافية الظل', 'Button shadow opacity'),
+                label: _t('شفافية الزجاج (الظل)', 'Glass opacity (shadow opacity)'),
                 value: cfg.buttonShadowOpacity,
                 min: 0,
                 max: 0.8,
                 onChanged: (v) => controller.setButtonShadowOpacity(v),
               ),
               _SliderTile(
-                label: _t('لمعة الأزرار', 'Button shine'),
+                label: _t('لمعة الزجاج', 'Glass shine intensity'),
                 value: cfg.buttonShine,
                 min: 0,
                 max: 1,
@@ -398,7 +507,8 @@ class DesignSettingsPage extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: controller.resetToDefaults,
                       icon: const Icon(Icons.restore),
-                      label: Text(_t('استعادة الافتراضي', 'Restore defaults')),
+                      label: Text(_t('استعادة الافتراضي (معاينة)',
+                          'Restore defaults (preview)')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -406,7 +516,7 @@ class DesignSettingsPage extends StatelessWidget {
                     child: OutlinedButton.icon(
                       onPressed: () => Navigator.of(context).pop(false),
                       icon: const Icon(Icons.close),
-                      label: Text(_t('إلغاء', 'Cancel')),
+                      label: Text(_t('إلغاء بدون حفظ', 'Cancel without saving')),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -419,7 +529,7 @@ class DesignSettingsPage extends StatelessWidget {
                         }
                       },
                       icon: const Icon(Icons.check),
-                      label: Text(_t('تطبيق', 'Apply')),
+                      label: Text(_t('تطبيق وحفظ', 'Apply & Save')),
                     ),
                   ),
                 ],
@@ -508,6 +618,28 @@ class DesignSettingsPage extends StatelessWidget {
   }
 }
 
+class _SectionHint extends StatelessWidget {
+  const _SectionHint(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          color: Color(0xFF475569),
+          height: 1.35,
+          letterSpacing: 0.08,
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
   final String text;
@@ -523,7 +655,79 @@ class _SectionTitle extends StatelessWidget {
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
           height: 1.3,
-          color: Color(0xFFF8FAFC),
+          color: Color(0xFF0F172A),
+        ),
+      ),
+    );
+  }
+}
+
+class _BrightnessIndicator extends StatelessWidget {
+  const _BrightnessIndicator({required this.value, required this.isArabic});
+
+  final double value;
+  final bool isArabic;
+
+  String _label() {
+    if (value > 0.08) return isArabic ? 'مُفَتَّح' : 'Lightened';
+    if (value < -0.08) return isArabic ? 'مُغَمَّق' : 'Darkened';
+    return isArabic ? 'محايد' : 'Neutral';
+  }
+
+  Color _chipColor() {
+    if (value > 0.08) return const Color(0xFF0EA5E9);
+    if (value < -0.08) return const Color(0xFF334155);
+    return const Color(0xFF64748B);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = ((value + 0.35) / 0.7).clamp(0.0, 1.0);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  isArabic ? 'مؤشر الإضاءة' : 'Brightness indicator',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _chipColor().withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: _chipColor().withOpacity(0.4)),
+                  ),
+                  child: Text(
+                    '${_label()}  ${value.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: _chipColor(),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: const Color(0xFFE2E8F0),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0EA5E9)),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -677,11 +881,8 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
       Color(0xFFFB7185),
     ];
     return AlertDialog(
-      backgroundColor: const Color(0xFF0F172A),
-      title: const Text(
-        'Pick color',
-        style: TextStyle(color: Color(0xFFF8FAFC)),
-      ),
+      backgroundColor: const Color(0xFFF8FAFC),
+      title: const Text('Pick color'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -733,10 +934,7 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text(
-            'Done',
-            style: TextStyle(color: Color(0xFF22D3EE)),
-          ),
+          child: const Text('Done'),
         ),
       ],
     );

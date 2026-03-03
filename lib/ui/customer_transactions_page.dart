@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../data/app_database.dart';
 import '../data/models/design_config.dart';
 import '../logic/design_controller.dart';
+import '../logic/home_logic.dart';
 import 'add_transaction_page.dart';
 import 'design_settings_page.dart';
 import 'home_page.dart';
@@ -37,9 +38,12 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   final DesignController _design = DesignController.instance;
   final ScrollController _tableScrollController = ScrollController();
   final Set<String> _selectedInvoices = <String>{};
+  final Set<int> _selectedCustomerIds = <int>{};
   final List<_TxRecord> _transactions = <_TxRecord>[];
+  final List<Customer> _customers = <Customer>[];
   late bool _isArabic;
   bool _isLoading = true;
+  bool _isCustomersLoading = true;
   bool _isNewThemePreview = false;
   AppDesignConfig? _newThemeSnapshot;
 
@@ -48,6 +52,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     super.initState();
     _isArabic = widget.initialArabic;
     _loadTransactions();
+    _loadCustomers();
   }
 
   @override
@@ -73,6 +78,240 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
         (invoice) => !_transactions.any((tx) => tx.invoiceNumber == invoice),
       );
     });
+  }
+
+  Future<void> _loadCustomers() async {
+    setState(() => _isCustomersLoading = true);
+    final rows = await _db.getCustomers();
+    if (!mounted) return;
+    setState(() {
+      _customers
+        ..clear()
+        ..addAll(rows);
+      _selectedCustomerIds.removeWhere((id) => !_customers.any((c) => c.id == id));
+      _selectedCustomerIds.add(widget.customerId);
+      _isCustomersLoading = false;
+    });
+  }
+
+  void _toggleCustomerSelection(int id) {
+    setState(() {
+      if (_selectedCustomerIds.contains(id)) {
+        _selectedCustomerIds.remove(id);
+      } else {
+        _selectedCustomerIds.add(id);
+      }
+    });
+  }
+
+  void _openCustomerTransactions(Customer customer) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => CustomerTransactionsPage(
+          initialArabic: _isArabic,
+          customerNameAr: customer.name,
+          customerNameEn: customer.nameEn,
+          customerId: customer.id,
+        ),
+      ),
+    );
+  }
+
+  void _openAddCustomerDialog() {
+    final nameController = TextEditingController();
+    final idController = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('إضافة عميل', 'Add Customer')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(labelText: _t('اسم العميل', 'Customer Name')),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: idController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'ID'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final rawName = nameController.text.trim();
+                final parsedId = int.tryParse(idController.text.trim());
+                if (rawName.isEmpty || parsedId == null) {
+                  _showMsg(
+                    _t('يرجى إدخال اسم صحيح و ID رقمي', 'Please enter a valid name and numeric ID'),
+                    error: true,
+                  );
+                  return;
+                }
+                if (_customers.any((c) => c.id == parsedId)) {
+                  _showMsg(_t('رقم ID مستخدم مسبقاً', 'ID already exists'), error: true);
+                  return;
+                }
+                await _db.insertCustomer(Customer(id: parsedId, name: rawName, nameEn: rawName));
+                await _loadCustomers();
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                _showMsg(_t('تمت إضافة العميل بنجاح', 'Customer added successfully'));
+              },
+              child: Text(_t('حفظ', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openEditCustomerDialog() {
+    if (_selectedCustomerIds.isEmpty) {
+      _showMsg(_t('حدد عميل أولاً للتعديل', 'Select a customer first to edit'), error: true);
+      return;
+    }
+    if (_selectedCustomerIds.length > 1) {
+      _showMsg(
+        _t('يمكن تعديل عميل واحد فقط في كل مرة', 'You can edit only one customer at a time'),
+        error: true,
+      );
+      return;
+    }
+
+    final selectedId = _selectedCustomerIds.first;
+    final index = _customers.indexWhere((c) => c.id == selectedId);
+    if (index == -1) return;
+    final target = _customers[index];
+    final nameController = TextEditingController(text: target.name);
+    final idController = TextEditingController(text: target.id.toString());
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('تعديل عميل', 'Edit Customer')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(labelText: _t('اسم العميل', 'Customer Name')),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: idController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'ID'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final rawName = nameController.text.trim();
+                final parsedId = int.tryParse(idController.text.trim());
+                if (rawName.isEmpty || parsedId == null) {
+                  _showMsg(
+                    _t('يرجى إدخال اسم صحيح و ID رقمي', 'Please enter a valid name and numeric ID'),
+                    error: true,
+                  );
+                  return;
+                }
+                final duplicated = _customers.any((c) => c.id == parsedId && c.id != target.id);
+                if (duplicated) {
+                  _showMsg(_t('رقم ID مستخدم مسبقاً', 'ID already exists'), error: true);
+                  return;
+                }
+                await _db.updateCustomer(
+                  target.id,
+                  Customer(id: parsedId, name: rawName, nameEn: rawName),
+                );
+                await _loadCustomers();
+                if (!dialogContext.mounted) return;
+                setState(() {
+                  _selectedCustomerIds
+                    ..clear()
+                    ..add(parsedId);
+                });
+                Navigator.of(dialogContext).pop();
+                _showMsg(_t('تم حفظ التعديل', 'Changes saved'));
+              },
+              child: Text(_t('حفظ', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _openDeleteCustomerDialog() {
+    if (_selectedCustomerIds.isEmpty) {
+      _showMsg(_t('حدد عميل أولاً للحذف', 'Select a customer first to delete'), error: true);
+      return;
+    }
+    final codeController = TextEditingController();
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(_t('حذف عميل', 'Delete Customer')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_t('هل أنت متأكد من حذف العميل المحدد؟', 'Are you sure you want to delete the selected customer?')),
+              const SizedBox(height: 8),
+              Text(
+                _t('للتأكيد أدخل كود الحذف 1234', 'To confirm, enter delete code 1234'),
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: codeController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: _t('كود التأكيد', 'Confirmation Code')),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(_t('إلغاء', 'Cancel')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+              onPressed: () async {
+                if (codeController.text.trim() != '1234') {
+                  _showMsg(_t('كود التأكيد غير صحيح', 'Invalid confirmation code'), error: true);
+                  return;
+                }
+                await _db.deleteCustomers(_selectedCustomerIds.toList());
+                await _loadCustomers();
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                _showMsg(_t('تم حذف العميل بنجاح', 'Customer deleted successfully'));
+              },
+              child: Text(_t('حفظ', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _t(String ar, String en) => _isArabic ? ar : en;
@@ -623,295 +862,557 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
         final statusBtn = cfg.useDistinctActionButtonColors
             ? cfg.actionStatusButtonColor
             : cfg.buttonBgColor;
-        return Scaffold(
-          body: Row(
-        textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
-        children: [
-          Container(
-            width: 240,
-            color: tone(cfg.sidebarColor),
+        const double headerCardWidth = 176;
+        const double headerCardHeight = 124;
+        Widget buildHeaderBrandCard() {
+          return Container(
+            width: headerCardWidth,
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+            decoration: BoxDecoration(
+              color: tone(cfg.sidebarColor).withOpacity(0.9),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0x265AA8FF)),
+            ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                  decoration: const BoxDecoration(
-                    border:
-                        Border(bottom: BorderSide(color: Color(0x26FFFFFF))),
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: tone(cfg.buttonBgColor),
+                    borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: tone(cfg.buttonBgColor),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: tone(cfg.buttonBgColor).withOpacity(0.35),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text(
-                          'EN',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'INFORM TYPING',
-                        style: TextStyle(
-                          color: Color(0xE6FFFFFF),
-                          fontSize: 11,
-                          letterSpacing: 2,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _t('إنفورم للطباعة والتصوير',
-                            'Inform Typing & Photo Copy'),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF93B5D3),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    border:
-                        Border(bottom: BorderSide(color: Color(0x26FFFFFF))),
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => setState(() => _isArabic = !_isArabic),
-                      style: TextButton.styleFrom(
-                        backgroundColor: tone(cfg.buttonBgColor),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      child: Text(_isArabic ? 'عربي / EN' : 'EN / عربي'),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      children: [
-                        _SideItem(
-                          icon: Icons.home_outlined,
-                          text: _t('الرئيسية', 'Home'),
-                          onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => HomePage(initialArabic: _isArabic),
-                              ),
-                            );
-                          },
-                        ),
-                        _SideItem(
-                          icon: Icons.groups_outlined,
-                          text: _t('العملاء', 'Customers'),
-                          onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => HomePage(initialArabic: _isArabic),
-                              ),
-                            );
-                          },
-                        ),
-                        _SideItem(
-                          icon: Icons.download_for_offline_outlined,
-                          text: _t('تحميل المرفقات', 'Download Attachments'),
-                          onPressed: _downloadSelectedAttachments,
-                        ),
-                        _SideItem(
-                          icon: Icons.delete_sweep_outlined,
-                          text: _t('حذف المرفقات', 'Delete Attachments'),
-                          onPressed: _deleteSelectedAttachments,
-                        ),
-                        _SideItem(
-                          icon: Icons.receipt_long_outlined,
-                          text: _t('الفواتير', 'Invoices'),
-                          active: true,
-                          onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => InvoicesPage(
-                                  initialArabic: _isArabic,
-                                  customerNameAr: widget.customerNameAr,
-                                  customerNameEn: widget.customerNameEn,
-                                  customerId: widget.customerId,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                        _SideItem(
-                          icon: Icons.bar_chart_outlined,
-                          text: _t('التقارير', 'Reports'),
-                          onPressed: () => _showMsg(
-                            _t('التقارير قيد التطوير', 'Reports feature is coming soon'),
-                          ),
-                        ),
-                        _SideItem(
-                          icon: Icons.settings_outlined,
-                          text: _t('إدارة التصميم', 'Design Manager'),
-                          onPressed: _openDesignSettings,
-                        ),
-                        _SideItem(
-                          icon: Icons.auto_awesome_outlined,
-                          text: _t('نيو ثيم', 'New Theme'),
-                          active: _isNewThemePreview,
-                          onPressed: _previewNewTheme,
-                        ),
-                        if (_isNewThemePreview)
-                          _SideItem(
-                            icon: Icons.check_circle_outline,
-                            text: _t('اعتماد نيو ثيم', 'Approve New Theme'),
-                            onPressed: _approveNewTheme,
-                          ),
-                        if (_isNewThemePreview)
-                          _SideItem(
-                            icon: Icons.cancel_outlined,
-                            text: _t('رفض نيو ثيم', 'Reject New Theme'),
-                            onPressed: _rejectNewTheme,
-                          ),
-                        const Spacer(),
-                        _SideItem(
-                          icon: Icons.logout,
-                          text: _t('تسجيل الخروج', 'Sign Out'),
-                          onPressed: () =>
-                              Navigator.of(context).popUntil((r) => r.isFirst),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text(
-                    'v1.0.0 - inform typing',
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'EN',
                     style: TextStyle(
-                      color: Color(0xFF7BA3C4),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
                     ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'INFORM TYPING',
+                  style: TextStyle(
+                    color: Color(0xE6FFFFFF),
+                    fontSize: 11,
+                    letterSpacing: 1.9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _t('إنفورم للطباعة والتصوير', 'Inform Typing & Photo Copy'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFFB8D2EA),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
+          );
+        }
+        Widget buildCenteredCustomerCard() {
+          return Container(
+            width: headerCardWidth,
+            height: headerCardHeight,
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+            decoration: BoxDecoration(
+              color: tone(cfg.tableHeaderColor).withOpacity(0.92),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0x334AA3FF)),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                Text(
+                  customerName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _t('رقم العميل: ${widget.customerId}', 'Customer ID: ${widget.customerId}'),
+                  style: const TextStyle(
+                    color: Color(0xFFE2ECFA),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
+          );
+        }
+        Widget buildHeaderMainNavButtons() {
+          return SizedBox(
+            width: 500,
+            child: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _ActionBtn(
+                  icon: Icons.home_outlined,
+                  text: _t('الرئيسية', 'Home'),
+                  color: tone(cfg.buttonBgColor),
+                  hover: tone(cfg.buttonBgColor),
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => HomePage(initialArabic: _isArabic),
+                      ),
+                    );
+                  },
+                ),
+                _ActionBtn(
+                  icon: Icons.receipt_long_outlined,
+                  text: _t('الفواتير', 'Invoices'),
+                  color: tone(cfg.buttonBgColor),
+                  hover: tone(cfg.buttonBgColor),
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => InvoicesPage(
+                          initialArabic: _isArabic,
+                          customerNameAr: widget.customerNameAr,
+                          customerNameEn: widget.customerNameEn,
+                          customerId: widget.customerId,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _ActionBtn(
+                  icon: Icons.bar_chart_outlined,
+                  text: _t('التقارير', 'Reports'),
+                  color: tone(cfg.buttonBgColor),
+                  hover: tone(cfg.buttonBgColor),
+                  onPressed: () =>
+                      _showMsg(_t('التقارير قيد التطوير', 'Reports feature is coming soon')),
+                ),
+                _ActionBtn(
+                  icon: Icons.auto_awesome_outlined,
+                  text: _t('نيو ثيم', 'New Theme'),
+                  color: tone(cfg.buttonBgColor),
+                  hover: tone(cfg.buttonBgColor),
+                  onPressed: _previewNewTheme,
+                ),
+                _ActionBtn(
+                  icon: Icons.settings_outlined,
+                  text: _t('إدارة التصميم', 'Design Manager'),
+                  color: tone(cfg.buttonBgColor),
+                  hover: tone(cfg.buttonBgColor),
+                  onPressed: _openDesignSettings,
+                ),
+                _ActionBtn(
+                  icon: Icons.logout,
+                  text: _t('تسجيل الخروج', 'Sign Out'),
+                  color: const Color(0xFFB91C1C),
+                  hover: const Color(0xFFB91C1C),
+                  onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                ),
+              ],
+            ),
+          );
+        }
+        Widget buildHeaderLanguageButtons() {
+          final active = tone(cfg.buttonBgColor);
+          final inactive = tone(cfg.tableHeaderColor);
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _ActionBtn(
+                icon: Icons.language,
+                text: 'AR',
+                color: _isArabic ? active : inactive,
+                hover: active,
+                onPressed: () => setState(() => _isArabic = true),
+              ),
+              const SizedBox(width: 6),
+              _ActionBtn(
+                icon: Icons.language,
+                text: 'EN',
+                color: _isArabic ? inactive : active,
+                hover: active,
+                onPressed: () => setState(() => _isArabic = false),
+              ),
+            ],
+          );
+        }
+        return Scaffold(
+          body: Column(
+            children: [
+              Container(
+                height: 48,
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                color: tone(cfg.sidebarColor),
+                child: Row(
+                  textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
+                  children: [
+                    const Text(
+                      'INFORM PROJECT EXE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const Spacer(),
+                    buildHeaderLanguageButtons(),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Row(
+        textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+            child: SizedBox(
+              width: 320,
+              child: Container(
+                color: tone(cfg.sidebarColor),
+                child: Column(
+                  children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 3,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: tone(cfg.buttonBgColor),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _t('قائمة العملاء', 'Customer List'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _ActionBtn(
+                                icon: Icons.person_add_alt_1,
+                                text: _t('إضافة', 'Add'),
+                                color: const Color(0xFF15803D),
+                                hover: const Color(0xFF15803D),
+                                onPressed: _openAddCustomerDialog,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _ActionBtn(
+                                icon: Icons.edit,
+                                text: _t('تعديل', 'Edit'),
+                                color: const Color(0xFF2563EB),
+                                hover: const Color(0xFF2563EB),
+                                onPressed: _openEditCustomerDialog,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _ActionBtn(
+                                icon: Icons.delete_outline,
+                                text: _t('حذف', 'Delete'),
+                                color: const Color(0xFFDC2626),
+                                hover: const Color(0xFFDC2626),
+                                onPressed: _openDeleteCustomerDialog,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: Color(0x2FFFFFFF)),
+                      Expanded(
+                        child: _isCustomersLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                                itemCount: _customers.length,
+                                itemBuilder: (context, index) {
+                                  final customer = _customers[index];
+                                  final customerName =
+                                      _isArabic ? customer.name : customer.nameEn;
+                                  final selected = _selectedCustomerIds.contains(customer.id) ||
+                                      customer.id == widget.customerId;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: () => _openCustomerTransactions(customer),
+                                      child: Container(
+                                        padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
+                                        decoration: BoxDecoration(
+                                          color: selected
+                                              ? const Color(0x1F60A5FA)
+                                              : const Color(0x0FFFFFFF),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: selected
+                                                ? const Color(0xFF60A5FA)
+                                                : const Color(0x2FFFFFFF),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Checkbox(
+                                              value: _selectedCustomerIds.contains(customer.id),
+                                              onChanged: (_) =>
+                                                  _toggleCustomerSelection(customer.id),
+                                              side: const BorderSide(
+                                                  color: Color(0xFF93C5FD), width: 1.4),
+                                              activeColor: const Color(0xFF2563EB),
+                                              visualDensity:
+                                                  const VisualDensity(horizontal: -4, vertical: -4),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    customerName,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    'ID: ${customer.id}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFFC6E2FF),
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.chevron_right,
+                                              color: Color(0xFFAED3FA),
+                                              size: 18,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ),
           Expanded(
             child: Container(
-              color: const Color(0xFFF8FAFC),
+              color: tone(cfg.tableAreaColor),
               child: Column(
                 children: [
                   Material(
-                    color: const Color(0xFFF8FAFC),
-                    elevation: 1,
+                    color: tone(cfg.tableAreaColor),
+                    elevation: 0,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 4,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: tone(cfg.buttonBgColor),
-                              borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFF2563EB), width: 1.4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Positioned(
+                              left: 10,
+                              top: 10,
+                              child: buildHeaderMainNavButtons(),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
+                            Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  _t('معاملات العميل', 'Customer Transactions'),
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                Text(
-                                  customerName,
-                                  style: TextStyle(
-                                    fontSize: 18,
+                                if (!_isArabic) ...[
+                                  buildHeaderBrandCard(),
+                                  const SizedBox(width: 14),
+                                ],
+                                Container(
+                                  width: 4,
+                                  height: 30,
+                                  decoration: BoxDecoration(
                                     color: tone(cfg.buttonBgColor),
-                                    fontWeight: FontWeight.w500,
+                                    borderRadius: BorderRadius.circular(999),
                                   ),
                                 ),
+                                const SizedBox(width: 12),
+                                const Expanded(child: SizedBox()),
+                                if (_isArabic) ...[
+                                  const SizedBox(width: 14),
+                                  buildHeaderBrandCard(),
+                                ],
                               ],
                             ),
-                          ),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _ActionBtn(
-                                icon: Icons.add,
-                                text: _t('إضافة معاملة', 'Add Transaction'),
-                                color: addBtn,
-                                hover: addBtn,
-                                onPressed: _openAddTransaction,
-                              ),
-                              _ActionBtn(
-                                icon: Icons.edit,
-                                text: _t('تعديل معاملة', 'Edit Transaction'),
-                                color: editBtn,
-                                hover: editBtn,
-                                onPressed: _openEditTransaction,
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: _openDeleteDialog,
-                                icon: const Icon(Icons.delete_outline, size: 16),
-                                label: Text(_t('حذف معاملة', 'Delete Transaction')),
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: Color(0x4DEF4444)),
-                                  foregroundColor: const Color(0xFFEF4444),
-                                  minimumSize: const Size(0, 36),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                              _ActionBtn(
-                                icon: Icons.check_circle_outline,
-                                text: _t('الحالة', 'Status'),
-                                color: statusBtn,
-                                hover: statusBtn,
-                                onPressed: _openStatusDialog,
-                              ),
-                            ],
-                          ),
-                        ],
+                            IgnorePointer(child: buildCenteredCustomerCard()),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                   Material(
                     color: Colors.transparent,
-                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+                      child: _isArabic
+                          ? Row(
+                              textDirection: TextDirection.ltr,
+                              children: [
+                                Expanded(
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      _ActionBtn(
+                                        icon: Icons.download_for_offline_outlined,
+                                        text: _t('تحميل المرفقات', 'Download Attachments'),
+                                        color: tone(cfg.buttonBgColor),
+                                        hover: tone(cfg.buttonBgColor),
+                                        onPressed: _downloadSelectedAttachments,
+                                      ),
+                                      _ActionBtn(
+                                        icon: Icons.delete_sweep_outlined,
+                                        text: _t('حذف المرفقات', 'Delete Attachments'),
+                                        color: const Color(0xFF991B1B),
+                                        hover: const Color(0xFF991B1B),
+                                        onPressed: _deleteSelectedAttachments,
+                                      ),
+                                      _ActionBtn(
+                                        icon: Icons.check_circle_outline,
+                                        text: _t('الحالة', 'Status'),
+                                        color: statusBtn,
+                                        hover: statusBtn,
+                                        onPressed: _openStatusDialog,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    _ActionBtn(
+                                      icon: Icons.add,
+                                      text: _t('إضافة معاملة', 'Add Transaction'),
+                                      color: addBtn,
+                                      hover: addBtn,
+                                      onPressed: _openAddTransaction,
+                                    ),
+                                    _ActionBtn(
+                                      icon: Icons.edit,
+                                      text: _t('تعديل معاملة', 'Edit Transaction'),
+                                      color: editBtn,
+                                      hover: editBtn,
+                                      onPressed: _openEditTransaction,
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: _openDeleteDialog,
+                                      icon: const Icon(Icons.delete_outline, size: 16),
+                                      label: Text(_t('حذف معاملة', 'Delete Transaction')),
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: Color(0x4DEF4444)),
+                                        foregroundColor: const Color(0xFFEF4444),
+                                        minimumSize: const Size(0, 36),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            )
+                          : Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _ActionBtn(
+                                    icon: Icons.add,
+                                    text: _t('إضافة معاملة', 'Add Transaction'),
+                                    color: addBtn,
+                                    hover: addBtn,
+                                    onPressed: _openAddTransaction,
+                                  ),
+                                  _ActionBtn(
+                                    icon: Icons.edit,
+                                    text: _t('تعديل معاملة', 'Edit Transaction'),
+                                    color: editBtn,
+                                    hover: editBtn,
+                                    onPressed: _openEditTransaction,
+                                  ),
+                                  OutlinedButton.icon(
+                                    onPressed: _openDeleteDialog,
+                                    icon: const Icon(Icons.delete_outline, size: 16),
+                                    label:
+                                        Text(_t('حذف معاملة', 'Delete Transaction')),
+                                    style: OutlinedButton.styleFrom(
+                                      side:
+                                          const BorderSide(color: Color(0x4DEF4444)),
+                                      foregroundColor: const Color(0xFFEF4444),
+                                      minimumSize: const Size(0, 36),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                                  _ActionBtn(
+                                    icon: Icons.check_circle_outline,
+                                    text: _t('الحالة', 'Status'),
+                                    color: statusBtn,
+                                    hover: statusBtn,
+                                    onPressed: _openStatusDialog,
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Material(
+                    color: Colors.transparent,
+                    elevation: 0,
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 24),
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -919,13 +1420,6 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         color: tone(cfg.tableHeaderColor),
                         borderRadius:
                             const BorderRadius.vertical(top: Radius.circular(12)),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x33000000),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          )
-                        ],
                       ),
                       child: Directionality(
                         textDirection: tableDirection,
@@ -952,7 +1446,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         ? const Center(child: CircularProgressIndicator())
                         : Container(
                       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      decoration: const BoxDecoration(color: Colors.transparent),
+                      decoration: BoxDecoration(color: tone(cfg.tableAreaColor)),
                       child: data.isEmpty
                           ? Center(
                               child: Text(
@@ -968,13 +1462,16 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         radius: const Radius.circular(8),
                         child: ListView.builder(
                           controller: _tableScrollController,
-                          padding: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.only(top: 18, bottom: 8),
                           itemCount: data.length,
                           itemBuilder: (context, txIndex) {
                           final tx = data[txIndex];
                           final isSelected =
                               _selectedInvoices.contains(tx.invoiceNumber);
                           final isDelivered = tx.status == 'تم التسليم';
+                          final cardBg = tone(cfg.transactionCardColor);
+                          final rowBgA = _design.shiftColor(cardBg, 0.03);
+                          final rowBgB = _design.shiftColor(cardBg, -0.03);
 
                           return Column(
                             children: [
@@ -982,7 +1479,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                 children: [
                                   Container(
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF1F5F9),
+                                        color: cardBg,
                                         border: Border.all(
                                           color: isSelected
                                               ? tone(cfg.buttonBgColor)
@@ -1080,8 +1577,8 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                 minHeight: cfg.transactionRowHeight,
                                               ),
                                               color: i.isEven
-                                                  ? const Color(0xFFF8FAFC)
-                                                  : const Color(0xFFEFF3F8),
+                                                  ? rowBgA
+                                                  : rowBgB,
                                               padding: EdgeInsets.symmetric(
                                                 horizontal: 18,
                                                 vertical: cfg.rowVerticalPadding,
@@ -1199,6 +1696,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
           ),
         ],
       ),
+              ),
+            ],
+          ),
     );
       },
     );
@@ -1330,6 +1830,84 @@ FontWeight _weightFromLevel(double level) {
   return FontWeight.w800;
 }
 
+class _ButtonVisual {
+  const _ButtonVisual({
+    required this.color,
+    required this.gradient,
+    required this.shadows,
+  });
+
+  final Color? color;
+  final Gradient? gradient;
+  final List<BoxShadow> shadows;
+}
+
+_ButtonVisual _resolveButtonVisual(AppDesignConfig cfg, Color base) {
+  final controller = DesignController.instance;
+  final shine = cfg.buttonShine.clamp(0.0, 1.0);
+  final blur = cfg.buttonShadowBlur.clamp(0.0, 30.0);
+  final shadowOpacity = cfg.buttonShadowOpacity.clamp(0.0, 0.8);
+  final dark = controller.shiftColor(base, -0.12);
+  final light = controller.shiftColor(base, 0.12);
+  final shadow = BoxShadow(
+    color: base.withOpacity(shadowOpacity),
+    blurRadius: blur,
+    offset: Offset(0, (2 + blur / 10).clamp(2, 6)),
+  );
+
+  return switch (cfg.buttonPresetStyle) {
+    1 => _ButtonVisual(
+        color: null,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [light, dark],
+        ),
+        shadows: [shadow],
+      ),
+    2 => _ButtonVisual(
+        color: null,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.alphaBlend(Colors.white.withOpacity(0.20 + (shine * 0.22)), base),
+            Color.alphaBlend(Colors.white.withOpacity(0.02 + (shine * 0.06)), dark),
+          ],
+        ),
+        shadows: [
+          shadow,
+          BoxShadow(
+            color: Colors.white.withOpacity(0.08 + (shine * 0.16)),
+            blurRadius: 6,
+            offset: const Offset(0, -1),
+          ),
+        ],
+      ),
+    3 => _ButtonVisual(
+        color: controller.shiftColor(base, 0.08),
+        gradient: null,
+        shadows: [
+          BoxShadow(
+            color: base.withOpacity((shadowOpacity * 0.65).clamp(0, 0.8)),
+            blurRadius: (blur * 0.6).clamp(0, 30),
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+    4 => _ButtonVisual(
+        color: Color.alphaBlend(Colors.white.withOpacity(0.08), base),
+        gradient: null,
+        shadows: const [],
+      ),
+    _ => _ButtonVisual(
+        color: base,
+        gradient: null,
+        shadows: [shadow],
+      ),
+  };
+}
+
 class _SideItem extends StatelessWidget {
   const _SideItem({
     required this.icon,
@@ -1354,30 +1932,40 @@ class _SideItem extends StatelessWidget {
       _ => cfg.buttonRadius,
     };
     final activeBg = controller.shiftColor(cfg.buttonBgColor, cfg.uiBrightnessShift);
+    final activeVisual = _resolveButtonVisual(cfg, activeBg);
     final activeFg = controller.onColorFor(activeBg);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: TextButton.icon(
-        onPressed: onPressed ?? () {},
-        style: TextButton.styleFrom(
-          backgroundColor: active ? activeBg : Colors.transparent,
-          foregroundColor: active ? activeFg : const Color(0xFFB0CDE4),
-          side: BorderSide(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: active ? activeVisual.color : Colors.transparent,
+          gradient: active ? activeVisual.gradient : null,
+          borderRadius: BorderRadius.circular(buttonRadius),
+          border: Border.all(
             color: active ? cfg.buttonBorderColor : Colors.transparent,
             width: cfg.buttonBorderWidth,
           ),
-          minimumSize: const Size(double.infinity, 40),
-          alignment: Alignment.centerLeft,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(buttonRadius),
-          ),
+          boxShadow: active ? activeVisual.shadows : const <BoxShadow>[],
         ),
-        icon: Icon(icon, size: 18),
-        label: Text(
-          text,
-          style: TextStyle(
-            fontSize: (cfg.baseFontSize - 0.5).clamp(11, 18),
-            fontWeight: _weightFromLevel(cfg.fontWeightLevel),
+        child: TextButton.icon(
+          onPressed: onPressed ?? () {},
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            foregroundColor: active ? activeFg : const Color(0xFFB0CDE4),
+            minimumSize: const Size(double.infinity, 40),
+            alignment: Alignment.centerLeft,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(buttonRadius),
+            ),
+          ),
+          icon: Icon(icon, size: 18),
+          label: Text(
+            text,
+            style: TextStyle(
+              fontSize: (cfg.baseFontSize - 0.5).clamp(11, 18),
+              fontWeight: _weightFromLevel(cfg.fontWeightLevel),
+            ),
           ),
         ),
       ),
@@ -1410,32 +1998,43 @@ class _ActionBtn extends StatelessWidget {
       3 => 14.0,
       _ => cfg.buttonRadius,
     };
+    final visual = _resolveButtonVisual(cfg, color);
     final fg = controller.hasGoodContrast(cfg.buttonTextColor, color, minRatio: 3.5)
         ? cfg.buttonTextColor
         : controller.onColorFor(color);
-    return TextButton.icon(
-      onPressed: onPressed ?? () {},
-      icon: Icon(icon, size: 16),
-      label: Text(text),
-      style: TextButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: fg,
-        minimumSize: const Size(0, 36),
-        side: BorderSide(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: visual.color,
+        gradient: visual.gradient,
+        borderRadius: BorderRadius.circular(buttonRadius),
+        border: Border.all(
           color: cfg.buttonBorderColor,
           width: cfg.buttonBorderWidth,
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(buttonRadius),
+        boxShadow: visual.shadows,
+      ),
+      child: TextButton.icon(
+        onPressed: onPressed ?? () {},
+        icon: Icon(icon, size: 16),
+        label: Text(text),
+        style: TextButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          foregroundColor: fg,
+          minimumSize: const Size(0, 36),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(buttonRadius),
+          ),
+          textStyle: TextStyle(
+            fontSize: (cfg.baseFontSize - 1).clamp(10, 16),
+            fontWeight: _weightFromLevel(cfg.fontWeightLevel),
+            letterSpacing: 0.1,
+            height: 1.3,
+          ),
+        ).copyWith(
+          overlayColor:
+              WidgetStatePropertyAll(hover.withOpacity(0.12 + (cfg.buttonShine * 0.22))),
         ),
-        textStyle: TextStyle(
-          fontSize: (cfg.baseFontSize - 1).clamp(10, 16),
-          fontWeight: _weightFromLevel(cfg.fontWeightLevel),
-          letterSpacing: 0.1,
-          height: 1.3,
-        ),
-      ).copyWith(
-        overlayColor: WidgetStatePropertyAll(hover.withOpacity(0.2)),
       ),
     );
   }
