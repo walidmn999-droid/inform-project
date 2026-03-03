@@ -21,6 +21,78 @@ class DesignSettingsPage extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final cfg = controller.config;
+        const panelBg = Color(0xFF0B1220);
+        const panelSurface = Color(0xFF131C2E);
+        const panelBorder = Color(0x334B5C7A);
+        const neonAccent = Color(0xFF22D3EE);
+        const neonAccentSoft = Color(0x6622D3EE);
+        final modernTheme = Theme.of(context).copyWith(
+          scaffoldBackgroundColor: panelBg,
+          cardTheme: CardTheme(
+            color: panelSurface.withOpacity(0.86),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: panelBorder),
+            ),
+            shadowColor: neonAccentSoft,
+            margin: const EdgeInsets.symmetric(vertical: 6),
+          ),
+          sliderTheme: Theme.of(context).sliderTheme.copyWith(
+                activeTrackColor: neonAccent,
+                thumbColor: neonAccent,
+                overlayColor: neonAccentSoft,
+                inactiveTrackColor: const Color(0xFF1F2C44),
+              ),
+          switchTheme: SwitchThemeData(
+            thumbColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? neonAccent
+                  : const Color(0xFF64748B),
+            ),
+            trackColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? neonAccentSoft
+                  : const Color(0x553B4E6A),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              backgroundColor: neonAccent,
+              foregroundColor: const Color(0xFF041320),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Color(0x6640E0FF), width: 1.1),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              textStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+                height: 1.35,
+              ),
+              elevation: 0,
+              shadowColor: neonAccentSoft,
+            ),
+          ),
+          textTheme: Theme.of(context).textTheme.apply(
+                fontFamily: cfg.fontFamilyName,
+                bodyColor: const Color(0xFFE2E8F0),
+                displayColor: const Color(0xFFF8FAFC),
+              ).copyWith(
+                bodyMedium: const TextStyle(
+                  letterSpacing: 0.15,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+                titleMedium: const TextStyle(
+                  letterSpacing: 0.1,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          dividerColor: const Color(0x223B4E6A),
+        );
         final body = ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -67,23 +139,44 @@ class DesignSettingsPage extends StatelessWidget {
                 max: 22,
                 onChanged: (v) => controller.setBaseFontSize(v),
               ),
-              Card(
-                child: ListTile(
-                  title: Text(_t('نوع الخط', 'Font family')),
-                  trailing: DropdownButton<String>(
-                    value: cfg.fontFamilyName,
-                    items: const [
-                      DropdownMenuItem(value: 'Segoe UI', child: Text('Segoe UI')),
-                      DropdownMenuItem(value: 'Arial', child: Text('Arial')),
-                      DropdownMenuItem(value: 'Tahoma', child: Text('Tahoma')),
-                      DropdownMenuItem(value: 'Calibri', child: Text('Calibri')),
-                      DropdownMenuItem(value: 'Courier New', child: Text('Courier New')),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) controller.setFontFamilyName(v);
-                    },
-                  ),
-                ),
+              Builder(
+                builder: (context) {
+                  const fontOptions = <String>[
+                    'Inter',
+                    'Poppins',
+                    'Segoe UI',
+                    'Arial',
+                    'Tahoma',
+                    'Calibri',
+                    'Courier New',
+                  ];
+                  final selectedFont = fontOptions.contains(cfg.fontFamilyName)
+                      ? cfg.fontFamilyName
+                      : fontOptions.first;
+                  return Card(
+                    child: ListTile(
+                      title: Text(_t('نوع الخط', 'Font family')),
+                      trailing: DropdownButton<String>(
+                        value: selectedFont,
+                        items: const [
+                          DropdownMenuItem(value: 'Inter', child: Text('Inter')),
+                          DropdownMenuItem(value: 'Poppins', child: Text('Poppins')),
+                          DropdownMenuItem(value: 'Segoe UI', child: Text('Segoe UI')),
+                          DropdownMenuItem(value: 'Arial', child: Text('Arial')),
+                          DropdownMenuItem(value: 'Tahoma', child: Text('Tahoma')),
+                          DropdownMenuItem(value: 'Calibri', child: Text('Calibri')),
+                          DropdownMenuItem(
+                            value: 'Courier New',
+                            child: Text('Courier New'),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) controller.setFontFamilyName(v);
+                        },
+                      ),
+                    ),
+                  );
+                },
               ),
               _SliderTile(
                 label: _t('سماكة الخط', 'Font weight'),
@@ -102,6 +195,40 @@ class DesignSettingsPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _SectionTitle(_t('الألوان', 'Colors')),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final id in DesignController.paletteIds)
+                        OutlinedButton(
+                          onPressed: () => controller.applyPalettePreset(id),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFE2E8F0),
+                            side: const BorderSide(color: Color(0x6640E0FF)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            backgroundColor: const Color(0x2218243A),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
+                          child: Text(
+                            DesignController.paletteTitle(id),
+                            style: const TextStyle(
+                              letterSpacing: 0.2,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
               _ColorTile(
                 label: _t('لون هيدر الجدول', 'Table header color'),
                 color: cfg.tableHeaderColor,
@@ -265,10 +392,37 @@ class DesignSettingsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: controller.resetToDefaults,
-                icon: const Icon(Icons.restore),
-                label: Text(_t('استعادة الافتراضي', 'Restore defaults')),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: controller.resetToDefaults,
+                      icon: const Icon(Icons.restore),
+                      label: Text(_t('استعادة الافتراضي', 'Restore defaults')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      icon: const Icon(Icons.close),
+                      label: Text(_t('إلغاء', 'Cancel')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        await controller.applyChanges();
+                        if (context.mounted) {
+                          Navigator.of(context).pop(true);
+                        }
+                      },
+                      icon: const Icon(Icons.check),
+                      label: Text(_t('تطبيق', 'Apply')),
+                    ),
+                  ),
+                ],
               ),
             ],
         );
@@ -282,15 +436,16 @@ class DesignSettingsPage extends StatelessWidget {
                   width: 420,
                   margin: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
+                    color: panelBg,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0x33000000),
-                        blurRadius: 14,
+                        color: neonAccentSoft,
+                        blurRadius: 20,
                         offset: Offset(0, 6),
                       ),
                     ],
+                    border: Border.all(color: panelBorder),
                   ),
                   child: Column(
                     children: [
@@ -315,7 +470,7 @@ class DesignSettingsPage extends StatelessWidget {
                               ),
                             ),
                             IconButton(
-                              onPressed: () => Navigator.of(context).pop(),
+                              onPressed: () => Navigator.of(context).pop(false),
                               icon: Icon(
                                 Icons.close,
                                 color: controller.onColorFor(cfg.sidebarColor),
@@ -324,7 +479,12 @@ class DesignSettingsPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Expanded(child: body),
+                      Expanded(
+                        child: Theme(
+                          data: modernTheme,
+                          child: body,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -338,7 +498,10 @@ class DesignSettingsPage extends StatelessWidget {
             backgroundColor: cfg.sidebarColor,
             foregroundColor: controller.onColorFor(cfg.sidebarColor),
           ),
-          body: body,
+          body: Theme(
+            data: modernTheme,
+            child: body,
+          ),
         );
       },
     );
@@ -355,7 +518,13 @@ class _SectionTitle extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+          height: 1.3,
+          color: Color(0xFFF8FAFC),
+        ),
       ),
     );
   }
@@ -379,12 +548,20 @@ class _SliderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      shadowColor: const Color(0x5522D3EE),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('$label: ${value.toStringAsFixed(1)}'),
+            Text(
+              '$label: ${value.toStringAsFixed(1)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.12,
+                height: 1.35,
+              ),
+            ),
             Slider(
               value: value,
               min: min,
@@ -412,15 +589,30 @@ class _ColorTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      shadowColor: const Color(0x5522D3EE),
       child: ListTile(
-        title: Text(label),
+        title: Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
+            height: 1.35,
+          ),
+        ),
         trailing: Container(
           width: 28,
           height: 28,
           decoration: BoxDecoration(
             color: color,
-            border: Border.all(color: Colors.black12),
+            border: Border.all(color: const Color(0x663B4E6A)),
             borderRadius: BorderRadius.circular(6),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x4422D3EE),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
         ),
         onTap: () async {
@@ -465,20 +657,31 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final current = Color.fromRGBO(_r.round(), _g.round(), _b.round(), 1);
-    const graySwatches = <Color>[
-      Color(0xFF000000),
-      Color(0xFF111111),
-      Color(0xFF1F2937),
-      Color(0xFF374151),
-      Color(0xFF4B5563),
-      Color(0xFF6B7280),
-      Color(0xFF9CA3AF),
-      Color(0xFFD1D5DB),
-      Color(0xFFE5E7EB),
-      Color(0xFFFFFFFF),
+    const modernSwatches = <Color>[
+      Color(0xFF0B1220),
+      Color(0xFF111827),
+      Color(0xFF1E293B),
+      Color(0xFF334155),
+      Color(0xFF475569),
+      Color(0xFF64748B),
+      Color(0xFF94A3B8),
+      Color(0xFFCBD5E1),
+      Color(0xFFE2E8F0),
+      Color(0xFFF8FAFC),
+      Color(0xFF22D3EE),
+      Color(0xFF14F1D9),
+      Color(0xFF60A5FA),
+      Color(0xFF6366F1),
+      Color(0xFF34D399),
+      Color(0xFFF59E0B),
+      Color(0xFFFB7185),
     ];
     return AlertDialog(
-      title: const Text('Pick color'),
+      backgroundColor: const Color(0xFF0F172A),
+      title: const Text(
+        'Pick color',
+        style: TextStyle(color: Color(0xFFF8FAFC)),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -499,7 +702,7 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
             spacing: 6,
             runSpacing: 6,
             children: [
-              for (final swatch in graySwatches)
+              for (final swatch in modernSwatches)
                 InkWell(
                   onTap: () => setState(() {
                     _r = swatch.red.toDouble();
@@ -516,8 +719,8 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
                       color: swatch,
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: swatch == const Color(0xFFFFFFFF)
-                            ? Colors.black26
+                        color: swatch == const Color(0xFFF8FAFC)
+                            ? const Color(0xAA334155)
                             : Colors.transparent,
                       ),
                     ),
@@ -530,7 +733,10 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Done'),
+          child: const Text(
+            'Done',
+            style: TextStyle(color: Color(0xFF22D3EE)),
+          ),
         ),
       ],
     );
