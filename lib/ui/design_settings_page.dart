@@ -21,6 +21,7 @@ class DesignSettingsPage extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final cfg = controller.config;
+        const textBlack = Color(0xFF000000);
         const panelBg = Color(0xFFF4F8FC);
         const panelSurface = Color(0xFFFFFFFF);
         const panelBorder = Color(0x22315574);
@@ -77,20 +78,26 @@ class DesignSettingsPage extends StatelessWidget {
           ),
           textTheme: Theme.of(context).textTheme.apply(
                 fontFamily: cfg.fontFamilyName,
-                bodyColor: const Color(0xFF0F172A),
-                displayColor: const Color(0xFF0F172A),
+                bodyColor: textBlack,
+                displayColor: textBlack,
               ).copyWith(
                 bodyMedium: const TextStyle(
                   letterSpacing: 0.15,
                   height: 1.45,
                   fontWeight: FontWeight.w600,
+                  color: textBlack,
                 ),
                 titleMedium: const TextStyle(
                   letterSpacing: 0.1,
                   height: 1.3,
                   fontWeight: FontWeight.w700,
+                  color: textBlack,
                 ),
               ),
+          listTileTheme: const ListTileThemeData(
+            textColor: textBlack,
+            iconColor: textBlack,
+          ),
           dividerColor: const Color(0x22315574),
         );
         final body = ListView(
@@ -110,6 +117,16 @@ class DesignSettingsPage extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+              const SizedBox(height: 8),
+              _SectionTitle(_t('الثيمات المحفوظة', 'Saved Themes')),
+              _SectionHint(_t(
+                'احفظ إعداداتك الحالية باسم محدد ثم انتقل بينها بسهولة.',
+                'Save your current setup with a custom name, then switch between themes quickly.',
+              )),
+              _SavedThemesPanel(
+                isArabic: isArabic,
+                t: _t,
               ),
               const SizedBox(height: 8),
               _SectionTitle(_t('الأحجام', 'Sizing')),
@@ -238,12 +255,12 @@ class DesignSettingsPage extends StatelessWidget {
                         OutlinedButton(
                           onPressed: () => controller.applyPalettePreset(id),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFE2E8F0),
+                            foregroundColor: const Color(0xFF000000),
                             side: const BorderSide(color: Color(0x6640E0FF)),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            backgroundColor: const Color(0x2218243A),
+                            backgroundColor: const Color(0xFFFFFFFF),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
                               vertical: 10,
@@ -310,7 +327,7 @@ class DesignSettingsPage extends StatelessWidget {
                         ),
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF475569),
+                          color: Color(0xFF000000),
                           height: 1.35,
                         ),
                       ),
@@ -524,6 +541,17 @@ class DesignSettingsPage extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: () async {
                         await controller.applyChanges();
+                        const appliedThemeName = 'Applied Theme';
+                        final savedThemes = await controller.getSavedThemes();
+                        final existing = savedThemes.where((t) => t.name == appliedThemeName);
+                        if (existing.isNotEmpty) {
+                          await controller.saveCurrentTheme(
+                            appliedThemeName,
+                            id: existing.first.id,
+                          );
+                        } else {
+                          await controller.saveCurrentTheme(appliedThemeName);
+                        }
                         if (context.mounted) {
                           Navigator.of(context).pop(true);
                         }
@@ -572,8 +600,8 @@ class DesignSettingsPage extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 _t('إعدادات التصميم', 'Design Settings'),
-                                style: TextStyle(
-                                  color: controller.onColorFor(cfg.sidebarColor),
+                                style: const TextStyle(
+                                  color: textBlack,
                                   fontSize: 17,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -581,9 +609,9 @@ class DesignSettingsPage extends StatelessWidget {
                             ),
                             IconButton(
                               onPressed: () => Navigator.of(context).pop(false),
-                              icon: Icon(
+                              icon: const Icon(
                                 Icons.close,
-                                color: controller.onColorFor(cfg.sidebarColor),
+                                color: textBlack,
                               ),
                             ),
                           ],
@@ -606,7 +634,7 @@ class DesignSettingsPage extends StatelessWidget {
           appBar: AppBar(
             title: Text(_t('إعدادات التصميم', 'Design Settings')),
             backgroundColor: cfg.sidebarColor,
-            foregroundColor: controller.onColorFor(cfg.sidebarColor),
+            foregroundColor: textBlack,
           ),
           body: Theme(
             data: modernTheme,
@@ -614,6 +642,282 @@ class DesignSettingsPage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _SavedThemesPanel extends StatefulWidget {
+  const _SavedThemesPanel({
+    required this.isArabic,
+    required this.t,
+  });
+
+  final bool isArabic;
+  final String Function(String ar, String en) t;
+
+  @override
+  State<_SavedThemesPanel> createState() => _SavedThemesPanelState();
+}
+
+class _SavedThemesPanelState extends State<_SavedThemesPanel> {
+  final TextEditingController _nameController = TextEditingController();
+  final DesignController _controller = DesignController.instance;
+  List<SavedDesignTheme> _themes = <SavedDesignTheme>[];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    final rows = await _controller.getSavedThemes();
+    if (!mounted) return;
+    setState(() {
+      _themes = rows;
+      _isLoading = false;
+    });
+  }
+
+  void _showMsg(String message, {bool error = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: error ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+      ),
+    );
+  }
+
+  Future<void> _saveTheme() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      _showMsg(widget.t('اكتب اسم للثيم أولاً', 'Enter a theme name first'), error: true);
+      return;
+    }
+    try {
+      await _controller.saveCurrentTheme(name);
+      _nameController.clear();
+      await _reload();
+      _showMsg(widget.t('تم حفظ الثيم بنجاح', 'Theme saved successfully'));
+    } on ArgumentError catch (e) {
+      final msg = (e.message ?? '').toString().toLowerCase().contains('exists')
+          ? widget.t('اسم الثيم موجود مسبقًا', 'Theme name already exists')
+          : widget.t('الاسم غير صالح', 'Invalid theme name');
+      _showMsg(msg, error: true);
+    }
+  }
+
+  Future<void> _applyTheme(SavedDesignTheme theme) async {
+    await _controller.previewSavedTheme(theme.id);
+    if (!mounted) return;
+    _showMsg(widget.t('تم تطبيق الثيم كمعاينة', 'Theme applied as preview'));
+  }
+
+  Future<void> _renameTheme(SavedDesignTheme theme) async {
+    final nameController = TextEditingController(text: theme.name);
+    final next = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(widget.t('إعادة تسمية الثيم', 'Rename Theme')),
+          content: TextField(
+            controller: nameController,
+            decoration: InputDecoration(
+              labelText: widget.t('اسم الثيم', 'Theme name'),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(widget.t('إلغاء', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(nameController.text.trim()),
+              child: Text(widget.t('حفظ', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+    nameController.dispose();
+
+    if (next == null) return;
+    if (next.trim().isEmpty) {
+      _showMsg(widget.t('اسم الثيم لا يمكن أن يكون فارغًا', 'Theme name cannot be empty'),
+          error: true);
+      return;
+    }
+
+    try {
+      await _controller.renameSavedTheme(theme.id, next);
+      await _reload();
+      _showMsg(widget.t('تم تعديل اسم الثيم', 'Theme renamed successfully'));
+    } on ArgumentError {
+      _showMsg(widget.t('الاسم موجود مسبقًا أو غير صالح', 'Name already exists or invalid'),
+          error: true);
+    }
+  }
+
+  Future<void> _deleteTheme(SavedDesignTheme theme) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(widget.t('حذف الثيم', 'Delete Theme')),
+          content: Text(
+            widget.t(
+              'هل تريد حذف الثيم "${theme.name}"؟',
+              'Do you want to delete "${theme.name}"?',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(widget.t('إلغاء', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(widget.t('حذف', 'Delete')),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+
+    await _controller.deleteSavedTheme(theme.id);
+    await _reload();
+    _showMsg(widget.t('تم حذف الثيم', 'Theme deleted'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _nameController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      labelText: widget.t('اسم الثيم', 'Theme Name'),
+                      labelStyle: const TextStyle(color: Colors.black),
+                      hintText:
+                          widget.t('مثال: ثيم أزرق احترافي', 'e.g. Pro Blue Theme'),
+                      hintStyle: const TextStyle(color: Colors.black54),
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _saveTheme,
+                  icon: const Icon(Icons.save),
+                  label: Text(widget.t('حفظ كثيم', 'Save Theme')),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LinearProgressIndicator(),
+              )
+            else if (_themes.isEmpty)
+              Text(
+                widget.t('لا توجد ثيمات محفوظة بعد', 'No saved themes yet'),
+                style: const TextStyle(color: Colors.black),
+              )
+            else
+              Column(
+                children: [
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final theme in _themes)
+                          OutlinedButton(
+                            onPressed: () => _applyTheme(theme),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF000000),
+                              side: const BorderSide(color: Color(0xFF94A3B8)),
+                              backgroundColor: const Color(0xFFFFFFFF),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                            ),
+                            child: Text(theme.name),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final theme in _themes)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(10),
+                        color: const Color(0xFFF8FAFC),
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          theme.name,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          widget.t(
+                            'آخر تحديث: ${theme.updatedAt.toLocal().toString().split('.').first}',
+                            'Updated: ${theme.updatedAt.toLocal().toString().split('.').first}',
+                          ),
+                          style: const TextStyle(color: Colors.black87),
+                        ),
+                        trailing: Wrap(
+                          spacing: 4,
+                          children: [
+                            TextButton(
+                              onPressed: () => _applyTheme(theme),
+                              child: Text(widget.t('تطبيق', 'Apply')),
+                            ),
+                            TextButton(
+                              onPressed: () => _renameTheme(theme),
+                              child: Text(widget.t('تعديل اسم', 'Rename')),
+                            ),
+                            TextButton(
+                              onPressed: () => _deleteTheme(theme),
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color(0xFFB91C1C),
+                              ),
+                              child: Text(widget.t('حذف', 'Delete')),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -631,7 +935,7 @@ class _SectionHint extends StatelessWidget {
         text,
         style: const TextStyle(
           fontSize: 12,
-          color: Color(0xFF475569),
+          color: Color(0xFF000000),
           height: 1.35,
           letterSpacing: 0.08,
         ),
@@ -655,7 +959,7 @@ class _SectionTitle extends StatelessWidget {
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
           height: 1.3,
-          color: Color(0xFF0F172A),
+          color: Color(0xFF000000),
         ),
       ),
     );
@@ -695,7 +999,7 @@ class _BrightnessIndicator extends StatelessWidget {
                   isArabic ? 'مؤشر الإضاءة' : 'Brightness indicator',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
+                    color: Color(0xFF000000),
                   ),
                 ),
                 const Spacer(),
@@ -708,8 +1012,8 @@ class _BrightnessIndicator extends StatelessWidget {
                   ),
                   child: Text(
                     '${_label()}  ${value.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: _chipColor(),
+                    style: const TextStyle(
+                      color: Color(0xFF000000),
                       fontWeight: FontWeight.w700,
                       fontSize: 11,
                     ),
@@ -764,6 +1068,7 @@ class _SliderTile extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.12,
                 height: 1.35,
+                color: Color(0xFF000000),
               ),
             ),
             Slider(
@@ -801,6 +1106,7 @@ class _ColorTile extends StatelessWidget {
             fontWeight: FontWeight.w600,
             letterSpacing: 0.1,
             height: 1.35,
+            color: Color(0xFF000000),
           ),
         ),
         trailing: Container(
@@ -882,7 +1188,7 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
     ];
     return AlertDialog(
       backgroundColor: const Color(0xFFF8FAFC),
-      title: const Text('Pick color'),
+      title: const Text('Pick color', style: TextStyle(color: Color(0xFF000000))),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -934,7 +1240,7 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Done'),
+          child: const Text('Done', style: TextStyle(color: Color(0xFF000000))),
         ),
       ],
     );
@@ -943,7 +1249,13 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
   Widget _rgbSlider(String label, double value, ValueChanged<double> onChanged) {
     return Row(
       children: [
-        SizedBox(width: 18, child: Text(label)),
+        SizedBox(
+          width: 18,
+          child: Text(
+            label,
+            style: const TextStyle(color: Color(0xFF000000)),
+          ),
+        ),
         Expanded(
           child: Slider(
             value: value,

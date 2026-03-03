@@ -11,8 +11,8 @@ import '../logic/design_controller.dart';
 import '../logic/home_logic.dart';
 import 'add_transaction_page.dart';
 import 'design_settings_page.dart';
-import 'home_page.dart';
 import 'invoices_page.dart';
+import 'login_page.dart';
 
 class CustomerTransactionsPage extends StatefulWidget {
   const CustomerTransactionsPage({
@@ -388,6 +388,17 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     }
   }
 
+  bool get _hasSelectedCustomer => widget.customerId > 0;
+
+  bool _ensureSelectedCustomer() {
+    if (_hasSelectedCustomer) return true;
+    _showMsg(
+      _t('اختر عميل أولاً من القائمة الجانبية', 'Please select a customer first from the sidebar'),
+      error: true,
+    );
+    return false;
+  }
+
   List<String> _selectedAttachmentPaths() {
     final selectedTx = _transactions
         .where((tx) => _selectedInvoices.contains(tx.invoiceNumber))
@@ -407,6 +418,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   }
 
   Future<void> _downloadSelectedAttachments() async {
+    if (!_ensureSelectedCustomer()) {
+      return;
+    }
     if (_selectedInvoices.isEmpty) {
       _showMsg(
         _t('حدد معاملة أو أكثر أولاً', 'Select one or more transactions first'),
@@ -483,6 +497,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   }
 
   void _deleteSelectedAttachments() {
+    if (!_ensureSelectedCustomer()) {
+      return;
+    }
     if (_selectedInvoices.isEmpty) {
       _showMsg(
         _t('حدد معاملة أو أكثر أولاً', 'Select one or more transactions first'),
@@ -557,15 +574,10 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   }
 
   Future<void> _openAddTransaction() async {
-    final result = await Navigator.of(context).push<AddTransactionResult>(
-      MaterialPageRoute(
-        builder: (_) => AddTransactionPage(
-          initialArabic: _isArabic,
-          customerNameAr: widget.customerNameAr,
-          customerNameEn: widget.customerNameEn,
-        ),
-      ),
-    );
+    if (!_ensureSelectedCustomer()) {
+      return;
+    }
+    final result = await _openTransactionEditorDialog();
     if (result == null) return;
     await _db.saveTransaction(customerId: widget.customerId, data: result);
     await _loadTransactions();
@@ -582,6 +594,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   }
 
   Future<void> _openEditTransaction() async {
+    if (!_ensureSelectedCustomer()) {
+      return;
+    }
     if (_selectedInvoices.isEmpty) {
       _showMsg(_t('حدد معاملة واحدة للتعديل', 'Select one transaction to edit'),
           error: true);
@@ -600,15 +615,8 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     if (index == -1) return;
     final source = _transactions[index];
 
-    final result = await Navigator.of(context).push<AddTransactionResult>(
-      MaterialPageRoute(
-        builder: (_) => AddTransactionPage(
-          initialArabic: _isArabic,
-          customerNameAr: widget.customerNameAr,
-          customerNameEn: widget.customerNameEn,
-          initialData: source.toAddTransactionResult(),
-        ),
-      ),
+    final result = await _openTransactionEditorDialog(
+      initialData: source.toAddTransactionResult(),
     );
     if (result == null) return;
     final updated = AddTransactionResult(
@@ -631,6 +639,39 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
         ..add(updated.invoiceNumber);
     });
     _showMsg(_t('تم تعديل المعاملة', 'Transaction updated'));
+  }
+
+  Future<AddTransactionResult?> _openTransactionEditorDialog({
+    AddTransactionResult? initialData,
+  }) {
+    return showDialog<AddTransactionResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final size = MediaQuery.of(dialogContext).size;
+        final dialogWidth = size.width > 1260 ? 1160.0 : size.width - 28;
+        final dialogHeight = size.height > 860 ? 760.0 : size.height - 28;
+
+        return Dialog(
+          insetPadding: const EdgeInsets.all(14),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: Color(0xFF93C5FD), width: 1.6),
+          ),
+          child: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: AddTransactionPage(
+              initialArabic: _isArabic,
+              customerNameAr: widget.customerNameAr,
+              customerNameEn: widget.customerNameEn,
+              initialData: initialData,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openDesignSettings() async {
@@ -716,6 +757,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   }
 
   void _openDeleteDialog() {
+    if (!_ensureSelectedCustomer()) {
+      return;
+    }
     if (_selectedInvoices.isEmpty) {
       _showMsg(_t('حدد معاملة أو أكثر للحذف', 'Select one or more transactions'),
           error: true);
@@ -781,6 +825,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
   }
 
   void _openStatusDialog() {
+    if (!_ensureSelectedCustomer()) {
+      return;
+    }
     if (_selectedInvoices.isEmpty) {
       _showMsg(_t('حدد معاملة أو أكثر لتغيير الحالة',
           'Select one or more transactions to change status'), error: true);
@@ -847,6 +894,13 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
         _isArabic ? widget.customerNameAr : widget.customerNameEn;
     final tableDirection = _isArabic ? TextDirection.rtl : TextDirection.ltr;
     final data = _sortedTransactions;
+    final hasSelectedCustomer = _hasSelectedCustomer;
+    final officeNameAr = widget.customerNameAr.trim().isEmpty
+        ? 'إنفورم للطباعة والتصوير'
+        : widget.customerNameAr;
+    final officeNameEn = widget.customerNameEn.trim().isEmpty
+        ? 'Inform Typing & Photo Copy'
+        : widget.customerNameEn;
 
     return AnimatedBuilder(
       animation: _design,
@@ -963,19 +1017,6 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
               runSpacing: 6,
               children: [
                 _ActionBtn(
-                  icon: Icons.home_outlined,
-                  text: _t('الرئيسية', 'Home'),
-                  color: tone(cfg.buttonBgColor),
-                  hover: tone(cfg.buttonBgColor),
-                  onPressed: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => HomePage(initialArabic: _isArabic),
-                      ),
-                    );
-                  },
-                ),
-                _ActionBtn(
                   icon: Icons.receipt_long_outlined,
                   text: _t('الفواتير', 'Invoices'),
                   color: tone(cfg.buttonBgColor),
@@ -1020,7 +1061,12 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                   text: _t('تسجيل الخروج', 'Sign Out'),
                   color: const Color(0xFFB91C1C),
                   hover: const Color(0xFFB91C1C),
-                  onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                      (route) => false,
+                    );
+                  },
                 ),
               ],
             ),
@@ -1410,44 +1456,72 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Material(
-                    color: Colors.transparent,
-                    elevation: 0,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 24),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: tone(cfg.tableHeaderColor),
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(12)),
-                      ),
-                      child: Directionality(
-                        textDirection: tableDirection,
-                        child: Row(
-                          children: [
-                            _HeaderCell(_t('بند الخدمة', 'Service'), 2.5),
-                            _HeaderCell(_t('العدد', 'Qty'), 0.8,
-                                align: TextAlign.center),
-                            _HeaderCell(_t('سعر الوحدة', 'Unit Price'), 1.1,
-                                align: TextAlign.center),
-                            _HeaderCell(_t('الإجمالي', 'Total'), 1.2,
-                                align: TextAlign.center),
-                            _HeaderCell(_t('اسم الشركة', 'Company'), 1.8),
-                            _HeaderCell(_t('اسم الموظف', 'Employee'), 1.3),
-                            _HeaderCell(_t('المرفقات', 'Files'), 1.8,
-                                align: TextAlign.center),
-                          ],
+                  if (hasSelectedCustomer)
+                    Material(
+                      color: Colors.transparent,
+                      elevation: 0,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: tone(cfg.tableHeaderColor),
+                          borderRadius:
+                              const BorderRadius.vertical(top: Radius.circular(12)),
+                        ),
+                        child: Directionality(
+                          textDirection: tableDirection,
+                          child: Row(
+                            children: [
+                              _HeaderCell(_t('بند الخدمة', 'Service'), 2.5),
+                              _HeaderCell(_t('العدد', 'Qty'), 0.8,
+                                  align: TextAlign.center),
+                              _HeaderCell(_t('سعر الوحدة', 'Unit Price'), 1.1,
+                                  align: TextAlign.center),
+                              _HeaderCell(_t('الإجمالي', 'Total'), 1.2,
+                                  align: TextAlign.center),
+                              _HeaderCell(_t('اسم الشركة', 'Company'), 1.8),
+                              _HeaderCell(_t('اسم الموظف', 'Employee'), 1.3),
+                              _HeaderCell(_t('المرفقات', 'Files'), 1.8,
+                                  align: TextAlign.center),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   Expanded(
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : Container(
                       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                       decoration: BoxDecoration(color: tone(cfg.tableAreaColor)),
-                      child: data.isEmpty
+                      child: !hasSelectedCustomer
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    officeNameAr,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 34,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    officeNameEn,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Color(0xFFD8EBFF),
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : data.isEmpty
                           ? Center(
                               child: Text(
                                 _t('لا توجد معاملات محفوظة', 'No saved transactions'),

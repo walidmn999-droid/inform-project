@@ -79,9 +79,8 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     super.initState();
     _isArabic = widget.initialArabic;
 
-    final seed = 100 + DateTime.now().millisecond % 900;
     _invoiceController = TextEditingController(
-      text: widget.initialData?.invoiceNumber ?? '$seed',
+      text: widget.initialData?.invoiceNumber ?? '',
     );
     _companyController = TextEditingController(
       text: widget.initialData?.company ?? '',
@@ -220,7 +219,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
     final currency = _isArabic ? 'د.إ' : 'AED';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF1F5F9),
       body: Directionality(
         textDirection: direction,
         child: SafeArea(
@@ -228,10 +227,12 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
             children: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                decoration: const BoxDecoration(
+                margin: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2563EB), width: 1.8),
                 ),
                 child: Text(
                   widget.initialData == null
@@ -240,21 +241,21 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF2563EB),
-                    fontSize: 30,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
               Container(
                 width: double.infinity,
-                color: const Color(0xFFF8FAFC),
-                padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+                color: const Color(0xFFF1F5F9),
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                 child: Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0x402563EB), width: 1.5),
+                    border: Border.all(color: const Color(0x802563EB), width: 1.5),
                   ),
                   child: Row(
                     children: [
@@ -266,14 +267,14 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                           textAlign: TextAlign.center,
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _Field(
                           label: _t('الشركة', 'Company'),
                           controller: _companyController,
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _Field(
                           label: _t('الموظف', 'Employee'),
@@ -281,7 +282,7 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
                           hint: _t('اختياري', 'Optional'),
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _Field(
                           label: _t('التاريخ', 'Date'),
@@ -294,35 +295,9 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 10, 24, 20),
+                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
                   child: Column(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            _t('بنود المعاملة', 'Transaction Items'),
-                            style: const TextStyle(
-                              color: Color(0xFF2B6CB0),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const Spacer(),
-                          OutlinedButton.icon(
-                            onPressed: _addItem,
-                            icon: const Icon(Icons.add, size: 16),
-                            label: Text(_t('إضافة بند', 'Add Item')),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF2563EB),
-                              side: const BorderSide(color: Color(0xFF2563EB)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
                       Column(
                         children: _items.asMap().entries.map((entry) {
                           final index = entry.key;
@@ -348,10 +323,12 @@ class _AddTransactionPageState extends State<AddTransactionPage> {
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: const BoxDecoration(
+                margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
                   color: Colors.white,
-                  border: Border(top: BorderSide(color: Color(0xFF2B6CB0), width: 2)),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF2B6CB0), width: 1.5),
                 ),
                 child: Row(
                   children: [
@@ -691,30 +668,60 @@ class _Field extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          readOnly: readOnly,
-          keyboardType: keyboardType,
-          onChanged: onChanged,
-          textAlign: textAlign ?? TextAlign.start,
-          decoration: InputDecoration(
-            hintText: hint,
-            filled: true,
-            fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.4),
-            ),
-          ),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) {
+            final hasValue = value.text.trim().isNotEmpty;
+            final markerColor = hasValue
+                ? const Color(0xFF16A34A)
+                : const Color(0x66DC2626);
+
+            return Stack(
+              children: [
+                TextField(
+                  controller: controller,
+                  readOnly: readOnly,
+                  keyboardType: keyboardType,
+                  onChanged: onChanged,
+                  textAlign: textAlign ?? TextAlign.start,
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    filled: true,
+                    fillColor: readOnly ? const Color(0xFFF8FAFC) : Colors.white,
+                    contentPadding:
+                        const EdgeInsetsDirectional.fromSTEB(12, 12, 24, 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF2563EB), width: 1.4),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 10,
+                  top: 6,
+                  bottom: 6,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 2,
+                      decoration: BoxDecoration(
+                        color: markerColor,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -737,10 +744,10 @@ class _ItemData {
 
   final String id;
   final TextEditingController service = TextEditingController();
-  final TextEditingController qty = TextEditingController(text: '1');
-  final TextEditingController unitPrice = TextEditingController(text: '0');
-  final TextEditingController discount = TextEditingController(text: '0');
-  final TextEditingController benefit = TextEditingController(text: '0');
+  final TextEditingController qty = TextEditingController();
+  final TextEditingController unitPrice = TextEditingController();
+  final TextEditingController discount = TextEditingController();
+  final TextEditingController benefit = TextEditingController();
   List<String> attachments = <String>[];
 
   double get total {

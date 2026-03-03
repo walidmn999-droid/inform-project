@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../logic/login_logic.dart';
-import 'home_page.dart';
+import 'customer_transactions_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -36,8 +36,15 @@ class _LoginPageState extends State<LoginPage> {
       _isLoading = false;
     });
 
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => HomePage(initialArabic: _isArabic)),
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => CustomerTransactionsPage(
+          initialArabic: _isArabic,
+          customerNameAr: 'إنفورم للطباعة والتصوير',
+          customerNameEn: 'Inform Typing & Photo Copy',
+          customerId: 0,
+        ),
+      ),
     );
   }
 

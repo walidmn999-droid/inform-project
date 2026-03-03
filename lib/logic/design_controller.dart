@@ -5,10 +5,81 @@ import 'package:flutter/material.dart';
 import '../data/app_database.dart';
 import '../data/models/design_config.dart';
 
+class SavedDesignTheme {
+  const SavedDesignTheme({
+    required this.id,
+    required this.name,
+    required this.config,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  final int id;
+  final String name;
+  final AppDesignConfig config;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  SavedDesignTheme copyWith({
+    int? id,
+    String? name,
+    AppDesignConfig? config,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return SavedDesignTheme(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      config: config ?? this.config,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  Map<String, Object?> toJson() {
+    return <String, Object?>{
+      'id': id,
+      'name': name,
+      'config': config.toJson(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  static SavedDesignTheme? fromJson(dynamic raw) {
+    if (raw is! Map) return null;
+    final map = raw.cast<Object?, Object?>();
+
+    final idRaw = map['id'];
+    final id = idRaw is num ? idRaw.toInt() : int.tryParse('$idRaw');
+    if (id == null) return null;
+
+    final name = (map['name']?.toString() ?? '').trim();
+    if (name.isEmpty) return null;
+
+    final configRaw = map['config'];
+    if (configRaw is! Map) return null;
+    final config = AppDesignConfig.fromJson(configRaw.cast<String, dynamic>());
+
+    final createdAtRaw = map['createdAt']?.toString();
+    final updatedAtRaw = map['updatedAt']?.toString();
+    final now = DateTime.now();
+
+    return SavedDesignTheme(
+      id: id,
+      name: name,
+      config: config,
+      createdAt: DateTime.tryParse(createdAtRaw ?? '') ?? now,
+      updatedAt: DateTime.tryParse(updatedAtRaw ?? '') ?? now,
+    );
+  }
+}
+
 class DesignController extends ChangeNotifier {
   DesignController._internal();
   static final DesignController instance = DesignController._internal();
   static const String _metaKey = 'design_config_v1';
+  static const String _savedThemesMetaKey = 'design_saved_themes_v1';
 
   final AppDatabase _db = AppDatabase.instance;
   AppDesignConfig _config = AppDesignConfig.defaults;
@@ -122,6 +193,96 @@ class DesignController extends ChangeNotifier {
       _previewUpdate(_config.copyWith(fontFamilyName: value));
   Future<void> setFontWeightLevel(double value) =>
       _previewUpdate(_config.copyWith(fontWeightLevel: value));
+
+  Future<List<SavedDesignTheme>> getSavedThemes() async {
+    final list = await _loadSavedThemes();
+    list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return list;
+  }
+
+  Future<SavedDesignTheme> saveCurrentTheme(String rawName, {int? id}) async {
+    final name = rawName.trim();
+    if (name.isEmpty) {
+      throw ArgumentError('Theme name cannot be empty');
+    }
+
+    final items = await _loadSavedThemes();
+    final normalizedName = name.toLowerCase();
+    final duplicated = items.any(
+      (item) => item.id != id && item.name.trim().toLowerCase() == normalizedName,
+    );
+    if (duplicated) {
+      throw ArgumentError('Theme name already exists');
+    }
+
+    final now = DateTime.now();
+    SavedDesignTheme saved;
+    if (id == null) {
+      final nextId =
+          items.isEmpty ? 1 : (items.map((e) => e.id).reduce((a, b) => a > b ? a : b) + 1);
+      saved = SavedDesignTheme(
+        id: nextId,
+        name: name,
+        config: _config,
+        createdAt: now,
+        updatedAt: now,
+      );
+      items.add(saved);
+    } else {
+      final index = items.indexWhere((item) => item.id == id);
+      if (index == -1) {
+        throw ArgumentError('Theme not found');
+      }
+      final base = items[index];
+      saved = base.copyWith(
+        name: name,
+        config: _config,
+        updatedAt: now,
+      );
+      items[index] = saved;
+    }
+
+    await _persistSavedThemes(items);
+    return saved;
+  }
+
+  Future<void> renameSavedTheme(int id, String rawName) async {
+    final name = rawName.trim();
+    if (name.isEmpty) {
+      throw ArgumentError('Theme name cannot be empty');
+    }
+    final items = await _loadSavedThemes();
+    final index = items.indexWhere((item) => item.id == id);
+    if (index == -1) {
+      throw ArgumentError('Theme not found');
+    }
+
+    final normalizedName = name.toLowerCase();
+    final duplicated = items.any(
+      (item) => item.id != id && item.name.trim().toLowerCase() == normalizedName,
+    );
+    if (duplicated) {
+      throw ArgumentError('Theme name already exists');
+    }
+
+    items[index] = items[index].copyWith(name: name, updatedAt: DateTime.now());
+    await _persistSavedThemes(items);
+  }
+
+  Future<void> deleteSavedTheme(int id) async {
+    final items = await _loadSavedThemes();
+    items.removeWhere((item) => item.id == id);
+    await _persistSavedThemes(items);
+  }
+
+  Future<void> previewSavedTheme(int id) async {
+    final items = await _loadSavedThemes();
+    final index = items.indexWhere((item) => item.id == id);
+    if (index == -1) {
+      throw ArgumentError('Theme not found');
+    }
+    preview(items[index].config);
+  }
 
   static const List<String> paletteIds = <String>[
     'new_theme_linked',
@@ -288,5 +449,34 @@ class DesignController extends ChangeNotifier {
   Future<void> _persist() async {
     final jsonText = jsonEncode(_config.toJson());
     await _db.setAppMetaValue(_metaKey, jsonText);
+  }
+
+  Future<List<SavedDesignTheme>> _loadSavedThemes() async {
+    final raw = await _db.getAppMetaValue(_savedThemesMetaKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return <SavedDesignTheme>[];
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return <SavedDesignTheme>[];
+      }
+      final output = <SavedDesignTheme>[];
+      for (final item in decoded) {
+        final parsed = SavedDesignTheme.fromJson(item);
+        if (parsed != null) {
+          output.add(parsed);
+        }
+      }
+      return output;
+    } catch (_) {
+      return <SavedDesignTheme>[];
+    }
+  }
+
+  Future<void> _persistSavedThemes(List<SavedDesignTheme> themes) async {
+    final jsonText = jsonEncode(themes.map((e) => e.toJson()).toList());
+    await _db.setAppMetaValue(_savedThemesMetaKey, jsonText);
   }
 }

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../logic/customer_transactions_logic.dart';
 import 'customer_transactions_page.dart';
-import 'home_page.dart';
 import 'invoice_print_page.dart';
+import 'login_page.dart';
 
 class InvoicesPage extends StatefulWidget {
   const InvoicesPage({
@@ -81,12 +81,21 @@ class _InvoicesPageState extends State<InvoicesPage> {
             onGoHome: () {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (_) => HomePage(initialArabic: _isArabic),
+                  builder: (_) => CustomerTransactionsPage(
+                    initialArabic: _isArabic,
+                    customerNameAr: widget.customerNameAr,
+                    customerNameEn: widget.customerNameEn,
+                    customerId: widget.customerId,
+                  ),
                 ),
               );
             },
-            onLogout: () =>
-                Navigator.of(context).popUntil((route) => route.isFirst),
+            onLogout: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+              );
+            },
           ),
           Expanded(
             child: Column(
@@ -109,7 +118,18 @@ class _InvoicesPageState extends State<InvoicesPage> {
                         ),
                       ),
                       TextButton.icon(
-                        onPressed: () => Navigator.of(context).maybePop(),
+                        onPressed: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => CustomerTransactionsPage(
+                                initialArabic: _isArabic,
+                                customerNameAr: widget.customerNameAr,
+                                customerNameEn: widget.customerNameEn,
+                                customerId: widget.customerId,
+                              ),
+                            ),
+                          );
+                        },
                         icon: const Icon(Icons.arrow_forward,
                             color: Colors.white, size: 16),
                         label: Text(
@@ -225,6 +245,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                                               widget.customerNameAr,
                                           customerNameEn:
                                               widget.customerNameEn,
+                                          customerId: widget.customerId,
                                         ),
                                       ),
                                     );
