@@ -1207,32 +1207,73 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                   final selected = _selectedCustomerIds.contains(customer.id) ||
                                       customer.id == widget.customerId;
 
+                                  // ── customer card config values ──────────
+                                  final cardBgBase  = cfg.customerCardBgColor;
+                                  final cardText    = cfg.customerCardTextColor;
+                                  final cardBorder  = cfg.customerCardBorderColor;
+                                  final cardRadius  = cfg.customerCardBorderRadius;
+                                  final cardFontSz  = cfg.customerCardFontSize;
+                                  final cardFamily  = cfg.customerCardFontFamily;
+                                  final cardBdrW    = cfg.customerCardBorderWidth;
+                                  final cardShadow  = cfg.customerCardShadowBlur;
+                                  final cardStyle   = cfg.customerCardStyle;
+
+                                  final resolvedBg = selected
+                                      ? Color.alphaBlend(const Color(0x3360A5FA), cardBgBase)
+                                      : cardBgBase;
+                                  final resolvedBorder = selected
+                                      ? const Color(0xFF60A5FA)
+                                      : cardBorder;
+                                  final subTextColor = Color.alphaBlend(
+                                      const Color(0x88FFFFFF), cardText);
+
+                                  BoxDecoration cardDeco;
+                                  switch (cardStyle) {
+                                    case 1: // Elevated
+                                      cardDeco = BoxDecoration(
+                                        color: resolvedBg,
+                                        borderRadius: BorderRadius.circular(cardRadius),
+                                        border: Border.all(color: resolvedBorder, width: cardBdrW),
+                                        boxShadow: [BoxShadow(color: cardBgBase.withOpacity(0.35), blurRadius: cardShadow == 0 ? 8 : cardShadow, offset: const Offset(0, 3))],
+                                      );
+                                    case 2: // Bordered
+                                      cardDeco = BoxDecoration(
+                                        color: resolvedBg,
+                                        borderRadius: BorderRadius.circular(cardRadius),
+                                        border: Border.all(color: resolvedBorder, width: cardBdrW == 0 ? 1.5 : cardBdrW * 1.5),
+                                        boxShadow: cardShadow > 0 ? [BoxShadow(color: cardBgBase.withOpacity(0.2), blurRadius: cardShadow)] : null,
+                                      );
+                                    case 3: // Glass
+                                      cardDeco = BoxDecoration(
+                                        color: resolvedBg.withOpacity(0.6),
+                                        borderRadius: BorderRadius.circular(cardRadius),
+                                        border: Border.all(color: resolvedBorder.withOpacity(0.5), width: cardBdrW),
+                                        boxShadow: cardShadow > 0 ? [BoxShadow(color: cardBgBase.withOpacity(0.15), blurRadius: cardShadow)] : null,
+                                      );
+                                    default: // 0: Flat
+                                      cardDeco = BoxDecoration(
+                                        color: resolvedBg,
+                                        borderRadius: BorderRadius.circular(cardRadius),
+                                        border: Border.all(color: resolvedBorder, width: cardBdrW),
+                                        boxShadow: cardShadow > 0 ? [BoxShadow(color: cardBgBase.withOpacity(0.2), blurRadius: cardShadow)] : null,
+                                      );
+                                  }
+
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 8),
                                     child: InkWell(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(cardRadius),
                                       onTap: () => _openCustomerTransactions(customer),
                                       child: Container(
                                         padding: const EdgeInsets.fromLTRB(8, 8, 10, 8),
-                                        decoration: BoxDecoration(
-                                          color: selected
-                                              ? const Color(0x1F60A5FA)
-                                              : const Color(0x0FFFFFFF),
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(
-                                            color: selected
-                                                ? const Color(0xFF60A5FA)
-                                                : const Color(0x2FFFFFFF),
-                                          ),
-                                        ),
+                                        decoration: cardDeco,
                                         child: Row(
                                           children: [
                                             Checkbox(
                                               value: _selectedCustomerIds.contains(customer.id),
                                               onChanged: (_) =>
                                                   _toggleCustomerSelection(customer.id),
-                                              side: const BorderSide(
-                                                  color: Color(0xFF93C5FD), width: 1.4),
+                                              side: BorderSide(color: subTextColor, width: 1.4),
                                               activeColor: const Color(0xFF2563EB),
                                               visualDensity:
                                                   const VisualDensity(horizontal: -4, vertical: -4),
@@ -1246,27 +1287,29 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                     customerName,
                                                     maxLines: 1,
                                                     overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 12,
+                                                    style: TextStyle(
+                                                      color: cardText,
+                                                      fontSize: cardFontSz,
                                                       fontWeight: FontWeight.w700,
+                                                      fontFamily: cardFamily,
                                                     ),
                                                   ),
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     'ID: ${customer.id}',
-                                                    style: const TextStyle(
-                                                      color: Color(0xFFC6E2FF),
-                                                      fontSize: 10,
+                                                    style: TextStyle(
+                                                      color: subTextColor,
+                                                      fontSize: (cardFontSz - 2).clamp(8, 18),
                                                       fontWeight: FontWeight.w600,
+                                                      fontFamily: cardFamily,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                            const Icon(
+                                            Icon(
                                               Icons.chevron_right,
-                                              color: Color(0xFFAED3FA),
+                                              color: subTextColor,
                                               size: 18,
                                             ),
                                           ],

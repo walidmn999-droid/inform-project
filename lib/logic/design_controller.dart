@@ -201,6 +201,24 @@ class DesignController extends ChangeNotifier {
       _previewUpdate(_config.copyWith(invoiceAccentColor: value));
   Future<void> setInvoiceTextColor(Color value) =>
       _previewUpdate(_config.copyWith(invoiceTextColor: value));
+  Future<void> setCustomerCardBgColor(Color value) =>
+      _previewUpdate(_config.copyWith(customerCardBgColor: value));
+  Future<void> setCustomerCardTextColor(Color value) =>
+      _previewUpdate(_config.copyWith(customerCardTextColor: value));
+  Future<void> setCustomerCardFontSize(double value) =>
+      _previewUpdate(_config.copyWith(customerCardFontSize: value));
+  Future<void> setCustomerCardFontFamily(String value) =>
+      _previewUpdate(_config.copyWith(customerCardFontFamily: value));
+  Future<void> setCustomerCardBorderRadius(double value) =>
+      _previewUpdate(_config.copyWith(customerCardBorderRadius: value));
+  Future<void> setCustomerCardBorderColor(Color value) =>
+      _previewUpdate(_config.copyWith(customerCardBorderColor: value));
+  Future<void> setCustomerCardBorderWidth(double value) =>
+      _previewUpdate(_config.copyWith(customerCardBorderWidth: value));
+  Future<void> setCustomerCardShadowBlur(double value) =>
+      _previewUpdate(_config.copyWith(customerCardShadowBlur: value));
+  Future<void> setCustomerCardStyle(int value) =>
+      _previewUpdate(_config.copyWith(customerCardStyle: value));
 
   Future<List<SavedDesignTheme>> getSavedThemes() async {
     final list = await _loadSavedThemes();

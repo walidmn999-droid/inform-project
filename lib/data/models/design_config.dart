@@ -34,6 +34,15 @@ class AppDesignConfig {
     required this.invoiceSecondaryColor,
     required this.invoiceAccentColor,
     required this.invoiceTextColor,
+    required this.customerCardBgColor,
+    required this.customerCardTextColor,
+    required this.customerCardFontSize,
+    required this.customerCardFontFamily,
+    required this.customerCardBorderRadius,
+    required this.customerCardBorderColor,
+    required this.customerCardBorderWidth,
+    required this.customerCardShadowBlur,
+    required this.customerCardStyle,
   });
 
   final Color tableHeaderColor;
@@ -68,6 +77,15 @@ class AppDesignConfig {
   final Color invoiceSecondaryColor;
   final Color invoiceAccentColor;
   final Color invoiceTextColor;
+  final Color customerCardBgColor;
+  final Color customerCardTextColor;
+  final double customerCardFontSize;
+  final String customerCardFontFamily;
+  final double customerCardBorderRadius;
+  final Color customerCardBorderColor;
+  final double customerCardBorderWidth;
+  final double customerCardShadowBlur;
+  final int customerCardStyle;
 
   static const AppDesignConfig defaults = AppDesignConfig(
     tableHeaderColor: Color(0xFF1E293B),
@@ -102,6 +120,15 @@ class AppDesignConfig {
     invoiceSecondaryColor: Color(0xFFE9EDF2),
     invoiceAccentColor: Color(0xFF6F8297),
     invoiceTextColor: Color(0xFF243241),
+    customerCardBgColor: Color(0xFF1E293B),
+    customerCardTextColor: Color(0xFFE2E8F0),
+    customerCardFontSize: 12,
+    customerCardFontFamily: 'Cairo',
+    customerCardBorderRadius: 10,
+    customerCardBorderColor: Color(0x2FFFFFFF),
+    customerCardBorderWidth: 1.0,
+    customerCardShadowBlur: 0,
+    customerCardStyle: 0,
   );
 
   AppDesignConfig copyWith({
@@ -137,6 +164,15 @@ class AppDesignConfig {
     Color? invoiceSecondaryColor,
     Color? invoiceAccentColor,
     Color? invoiceTextColor,
+    Color? customerCardBgColor,
+    Color? customerCardTextColor,
+    double? customerCardFontSize,
+    String? customerCardFontFamily,
+    double? customerCardBorderRadius,
+    Color? customerCardBorderColor,
+    double? customerCardBorderWidth,
+    double? customerCardShadowBlur,
+    int? customerCardStyle,
   }) {
     return AppDesignConfig(
       tableHeaderColor: tableHeaderColor ?? this.tableHeaderColor,
@@ -172,6 +208,15 @@ class AppDesignConfig {
       invoiceSecondaryColor: invoiceSecondaryColor ?? this.invoiceSecondaryColor,
       invoiceAccentColor: invoiceAccentColor ?? this.invoiceAccentColor,
       invoiceTextColor: invoiceTextColor ?? this.invoiceTextColor,
+      customerCardBgColor: customerCardBgColor ?? this.customerCardBgColor,
+      customerCardTextColor: customerCardTextColor ?? this.customerCardTextColor,
+      customerCardFontSize: _clamp(customerCardFontSize ?? this.customerCardFontSize, 9, 20),
+      customerCardFontFamily: customerCardFontFamily ?? this.customerCardFontFamily,
+      customerCardBorderRadius: _clamp(customerCardBorderRadius ?? this.customerCardBorderRadius, 0, 24),
+      customerCardBorderColor: customerCardBorderColor ?? this.customerCardBorderColor,
+      customerCardBorderWidth: _clamp(customerCardBorderWidth ?? this.customerCardBorderWidth, 0, 4),
+      customerCardShadowBlur: _clamp(customerCardShadowBlur ?? this.customerCardShadowBlur, 0, 24),
+      customerCardStyle: (customerCardStyle ?? this.customerCardStyle).clamp(0, 3).toInt(),
     );
   }
 
@@ -209,6 +254,15 @@ class AppDesignConfig {
       'invoiceSecondaryColor': invoiceSecondaryColor.value,
       'invoiceAccentColor': invoiceAccentColor.value,
       'invoiceTextColor': invoiceTextColor.value,
+      'customerCardBgColor': customerCardBgColor.value,
+      'customerCardTextColor': customerCardTextColor.value,
+      'customerCardFontSize': customerCardFontSize,
+      'customerCardFontFamily': customerCardFontFamily,
+      'customerCardBorderRadius': customerCardBorderRadius,
+      'customerCardBorderColor': customerCardBorderColor.value,
+      'customerCardBorderWidth': customerCardBorderWidth,
+      'customerCardShadowBlur': customerCardShadowBlur,
+      'customerCardStyle': customerCardStyle,
     };
   }
 
@@ -275,6 +329,28 @@ class AppDesignConfig {
           _colorOrDefault(json['invoiceAccentColor'], defaults.invoiceAccentColor),
       invoiceTextColor:
           _colorOrDefault(json['invoiceTextColor'], defaults.invoiceTextColor),
+      customerCardBgColor:
+          _colorOrDefault(json['customerCardBgColor'], defaults.customerCardBgColor),
+      customerCardTextColor:
+          _colorOrDefault(json['customerCardTextColor'], defaults.customerCardTextColor),
+      customerCardFontSize:
+          _doubleOrDefault(json['customerCardFontSize'], defaults.customerCardFontSize),
+      customerCardFontFamily:
+          (json['customerCardFontFamily'] as String?)?.trim().isNotEmpty == true
+              ? json['customerCardFontFamily'] as String
+              : defaults.customerCardFontFamily,
+      customerCardBorderRadius:
+          _doubleOrDefault(json['customerCardBorderRadius'], defaults.customerCardBorderRadius),
+      customerCardBorderColor:
+          _colorOrDefault(json['customerCardBorderColor'], defaults.customerCardBorderColor),
+      customerCardBorderWidth:
+          _doubleOrDefault(json['customerCardBorderWidth'], defaults.customerCardBorderWidth),
+      customerCardShadowBlur:
+          _doubleOrDefault(json['customerCardShadowBlur'], defaults.customerCardShadowBlur),
+      customerCardStyle:
+          _doubleOrDefault(json['customerCardStyle'], defaults.customerCardStyle.toDouble())
+              .toInt()
+              .clamp(0, 3),
     );
   }
 

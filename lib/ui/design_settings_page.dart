@@ -21,23 +21,25 @@ class DesignSettingsPage extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final cfg = controller.config;
-        const textBlack = Color(0xFF000000);
-        const panelBg = Color(0xFFF4F8FC);
-        const panelSurface = Color(0xFFFFFFFF);
-        const panelBorder = Color(0x22315574);
+        const textBlack = Color(0xFF0F172A);
+        const panelBg = Color(0xFFFFFFFF);
+        const panelBorder = Color(0xFFE2E8F0);
         const neonAccent = Color(0xFF0EA5E9);
         const neonAccentSoft = Color(0x330EA5E9);
+        const fontOptions = <String>[
+          'Cairo', 'Inter', 'Poppins', 'Arial', 'Tahoma', 'Calibri', 'Courier New',
+        ];
         final modernTheme = Theme.of(context).copyWith(
           scaffoldBackgroundColor: panelBg,
           cardTheme: CardTheme(
-            color: panelSurface,
+            color: panelBg,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               side: const BorderSide(color: panelBorder),
             ),
             shadowColor: neonAccentSoft,
-            margin: const EdgeInsets.symmetric(vertical: 6),
+            margin: const EdgeInsets.symmetric(vertical: 4),
           ),
           sliderTheme: Theme.of(context).sliderTheme.copyWith(
                 activeTrackColor: neonAccent,
@@ -98,497 +100,317 @@ class DesignSettingsPage extends StatelessWidget {
             textColor: textBlack,
             iconColor: textBlack,
           ),
-          dividerColor: const Color(0x22315574),
+          dividerColor: panelBorder,
         );
+
         final body = ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.info_outline, color: Color(0xFF22D3EE)),
-                  title: Text(
-                    _t('طريقة الاستخدام', 'How to use'),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text(
-                    _t(
-                      'كل تغيير هنا يظهر مباشرة كمعاينة. لن يتم الحفظ الدائم إلا بعد الضغط على "تطبيق".\nلإلغاء التغييرات الحالية اضغط "إلغاء".',
-                      'All changes here are live preview. Permanent save happens only after "Apply".\nUse "Cancel" to discard current changes.',
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+          children: [
+            // ── Info hint ──────────────────────────────────────────────────
+            Card(
+              child: ListTile(
+                dense: true,
+                leading: const Icon(Icons.info_outline, color: Color(0xFF0EA5E9), size: 20),
+                title: Text(
+                  _t('كل تغيير يظهر فورًا. التطبيق الدائم فقط عند الضغط "تطبيق وحفظ".', 'Changes are live. Save permanently only after "Apply & Save".'),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textBlack),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ── Saved themes ───────────────────────────────────────────────
+            _SectionTitle(_t('الثيمات المحفوظة', 'Saved Themes')),
+            _SavedThemesPanel(isArabic: isArabic, t: _t),
+            const SizedBox(height: 6),
+
+            // ── Palette presets ────────────────────────────────────────────
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_t('باليتات جاهزة', 'Ready Palettes'),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textBlack)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        for (final id in DesignController.paletteIds)
+                          OutlinedButton(
+                            onPressed: () => controller.applyPalettePreset(id),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: textBlack,
+                              side: const BorderSide(color: Color(0xFFCBD5E1)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              backgroundColor: panelBg,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            ),
+                            child: Text(
+                              id == 'new_theme_linked'
+                                  ? _t('نيو ثيم', 'New Theme')
+                                  : DesignController.paletteTitle(id),
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Section 1: General ─────────────────────────────────────────
+            _CollapsibleSection(
+              title: _t('إعدادات عامة', 'General Settings'),
+              icon: Icons.tune_rounded,
+              accentColor: const Color(0xFF64748B),
+              children: [
+                _BrightnessIndicator(value: cfg.uiBrightnessShift, isArabic: isArabic),
+                _SliderTile(
+                  label: _t('تفتيح/تغميق التصميم', 'Lighten/Darken'),
+                  value: cfg.uiBrightnessShift, min: -0.35, max: 0.35,
+                  onChanged: (v) => controller.setUiBrightnessShift(v),
+                ),
+                Card(
+                  child: ListTile(
+                    title: Text(_t('نوع خط التطبيق', 'App font family')),
+                    trailing: DropdownButton<String>(
+                      value: fontOptions.contains(cfg.fontFamilyName) ? cfg.fontFamilyName : 'Inter',
+                      items: fontOptions.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+                      onChanged: (v) { if (v != null) controller.setFontFamilyName(v); },
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              _SectionTitle(_t('الثيمات المحفوظة', 'Saved Themes')),
-              _SectionHint(_t(
-                'احفظ إعداداتك الحالية باسم محدد ثم انتقل بينها بسهولة.',
-                'Save your current setup with a custom name, then switch between themes quickly.',
-              )),
-              _SavedThemesPanel(
-                isArabic: isArabic,
-                t: _t,
-              ),
-              const SizedBox(height: 8),
-              _SectionTitle(_t('الأحجام', 'Sizing')),
-              _SectionHint(_t(
-                'هذه الإعدادات تتحكم في المقاسات والمسافات داخل جدول المعاملات.',
-                'These settings control dimensions and spacing inside the transactions table.',
-              )),
-              _SliderTile(
-                label: _t('حجم أيقونة المرفقات', 'Attachment icon size'),
-                value: cfg.attachmentIconSize,
-                min: 8,
-                max: 24,
-                onChanged: (v) => controller.setAttachmentIconSize(v),
-              ),
-              _SliderTile(
-                label: _t('ارتفاع صف المعاملة', 'Transaction row height'),
-                value: cfg.transactionRowHeight,
-                min: 34,
-                max: 74,
-                onChanged: (v) => controller.setTransactionRowHeight(v),
-              ),
-              _SliderTile(
-                label: _t('المسافة الرأسية داخل الصف', 'Row vertical spacing'),
-                value: cfg.rowVerticalPadding,
-                min: 2,
-                max: 24,
-                onChanged: (v) => controller.setRowVerticalPadding(v),
-              ),
-              _SliderTile(
-                label: _t('المسافة بين كروت المعاملات', 'Spacing between cards'),
-                value: cfg.cardSpacing,
-                min: 2,
-                max: 24,
-                onChanged: (v) => controller.setCardSpacing(v),
-              ),
-              _SliderTile(
-                label: _t('سماكة إطار الكارت', 'Card border thickness'),
-                value: cfg.cardBorderWidth,
-                min: 0.6,
-                max: 3.5,
-                onChanged: (v) => controller.setCardBorderWidth(v),
-              ),
-              _SliderTile(
-                label: _t('حجم الخط الأساسي', 'Base font size'),
-                value: cfg.baseFontSize,
-                min: 11,
-                max: 22,
-                onChanged: (v) => controller.setBaseFontSize(v),
-              ),
-              Builder(
-                builder: (context) {
-                  const fontOptions = <String>[
-                    'Inter',
-                    'Poppins',
-                    'Segoe UI',
-                    'Arial',
-                    'Tahoma',
-                    'Calibri',
-                    'Courier New',
-                  ];
-                  final selectedFont = fontOptions.contains(cfg.fontFamilyName)
-                      ? cfg.fontFamilyName
-                      : fontOptions.first;
-                  return Card(
-                    child: ListTile(
-                      title: Text(_t('نوع الخط', 'Font family')),
-                      trailing: DropdownButton<String>(
-                        value: selectedFont,
-                        items: const [
-                          DropdownMenuItem(value: 'Inter', child: Text('Inter')),
-                          DropdownMenuItem(value: 'Poppins', child: Text('Poppins')),
-                          DropdownMenuItem(value: 'Segoe UI', child: Text('Segoe UI')),
-                          DropdownMenuItem(value: 'Arial', child: Text('Arial')),
-                          DropdownMenuItem(value: 'Tahoma', child: Text('Tahoma')),
-                          DropdownMenuItem(value: 'Calibri', child: Text('Calibri')),
-                          DropdownMenuItem(
-                            value: 'Courier New',
-                            child: Text('Courier New'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) controller.setFontFamilyName(v);
-                        },
-                      ),
+                _SliderTile(label: _t('سماكة الخط', 'Font weight'), value: cfg.fontWeightLevel, min: 300, max: 800, onChanged: (v) => controller.setFontWeightLevel(v)),
+                _SliderTile(label: _t('حجم الخط الأساسي', 'Base font size'), value: cfg.baseFontSize, min: 11, max: 22, onChanged: (v) => controller.setBaseFontSize(v)),
+              ],
+            ),
+
+            // ── Section 2: Customer Table ──────────────────────────────────
+            _CollapsibleSection(
+              title: _t('جدول العملاء', 'Customer Table'),
+              icon: Icons.table_rows_rounded,
+              accentColor: const Color(0xFF0EA5E9),
+              children: [
+                _ColorTile(label: _t('لون هيدر الجدول', 'Table header color'), color: cfg.tableHeaderColor, onPicked: (c) => controller.setTableHeaderColor(c)),
+                _ColorTile(label: _t('لون خلفية الجدول', 'Table area color'), color: cfg.tableAreaColor, onPicked: (c) => controller.setTableAreaColor(c)),
+                _ColorTile(label: _t('لون كروت المعاملات', 'Transaction card color'), color: cfg.transactionCardColor, onPicked: (c) => controller.setTransactionCardColor(c)),
+                _SliderTile(label: _t('ارتفاع الصف', 'Row height'), value: cfg.transactionRowHeight, min: 34, max: 74, onChanged: (v) => controller.setTransactionRowHeight(v)),
+                _SliderTile(label: _t('المسافة الرأسية داخل الصف', 'Row vertical spacing'), value: cfg.rowVerticalPadding, min: 2, max: 24, onChanged: (v) => controller.setRowVerticalPadding(v)),
+                _SliderTile(label: _t('المسافة بين الكروت', 'Card spacing'), value: cfg.cardSpacing, min: 2, max: 24, onChanged: (v) => controller.setCardSpacing(v)),
+                _SliderTile(label: _t('سماكة إطار الكارت', 'Card border width'), value: cfg.cardBorderWidth, min: 0.6, max: 3.5, onChanged: (v) => controller.setCardBorderWidth(v)),
+                _SliderTile(label: _t('حجم أيقونة المرفقات', 'Attachment icon size'), value: cfg.attachmentIconSize, min: 8, max: 24, onChanged: (v) => controller.setAttachmentIconSize(v)),
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      controller.hasGoodContrast(controller.onColorFor(cfg.tableHeaderColor), cfg.tableHeaderColor) ? Icons.check_circle : Icons.warning_amber_rounded,
+                      color: controller.hasGoodContrast(controller.onColorFor(cfg.tableHeaderColor), cfg.tableHeaderColor) ? Colors.green : Colors.orange,
                     ),
-                  );
-                },
-              ),
-              _SliderTile(
-                label: _t('سماكة الخط', 'Font weight'),
-                value: cfg.fontWeightLevel,
-                min: 300,
-                max: 800,
-                onChanged: (v) => controller.setFontWeightLevel(v),
-              ),
-              _SectionTitle(_t('خيارات التصميم العامة', 'Global design options')),
-              _SectionHint(_t(
-                'تفتيح/تغميق سريع على كامل المظهر بدون تغيير القيم الأساسية.',
-                'Quick brighten/darken over the whole look without replacing your base values.',
-              )),
-              _BrightnessIndicator(
-                value: cfg.uiBrightnessShift,
-                isArabic: isArabic,
-              ),
-              _SliderTile(
-                label: _t('تفتيح/تغميق التصميم', 'Lighten/Darken design'),
-                value: cfg.uiBrightnessShift,
-                min: -0.35,
-                max: 0.35,
-                onChanged: (v) => controller.setUiBrightnessShift(v),
-              ),
-              const SizedBox(height: 16),
-              _SectionTitle(_t('الألوان', 'Colors')),
-              _SectionHint(_t(
-                'اختر باليتة جاهزة أو عدّل كل لون يدويًا.',
-                'Choose a ready palette or customize each color manually.',
-              )),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final id in DesignController.paletteIds)
-                        OutlinedButton(
-                          onPressed: () => controller.applyPalettePreset(id),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF000000),
-                            side: const BorderSide(color: Color(0x6640E0FF)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            backgroundColor: const Color(0xFFFFFFFF),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                          ),
-                          child: Text(
-                            id == 'new_theme_linked'
-                                ? _t('نيو ثيم (مرتبط بزر السايدبار)',
-                                    'New Theme (linked to sidebar button)')
-                                : DesignController.paletteTitle(id),
-                            style: const TextStyle(
-                              letterSpacing: 0.2,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
+                    title: Text(_t('فحص التباين', 'Contrast check')),
+                    subtitle: Text(_t('يتم ضبط لون النص تلقائياً.', 'Text color is auto-adjusted.')),
                   ),
-                ),
-              ),
-              _ColorTile(
-                label: _t('لون هيدر الجدول', 'Table header color'),
-                color: cfg.tableHeaderColor,
-                onPicked: (c) => controller.setTableHeaderColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون خلفية الجدول', 'Table area color'),
-                color: cfg.tableAreaColor,
-                onPicked: (c) => controller.setTableAreaColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون كروت المعاملات', 'Transaction card color'),
-                color: cfg.transactionCardColor,
-                onPicked: (c) => controller.setTransactionCardColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون السايدبار', 'Sidebar color'),
-                color: cfg.sidebarColor,
-                onPicked: (c) => controller.setSidebarColor(c),
-              ),
-              _SectionTitle(_t('ألوان الفاتورة', 'Invoice Colors')),
-              _SectionHint(_t(
-                'هذه الألوان تتحكم في تصميم الفاتورة 3 بالكامل وتتحدث فورًا.',
-                'These colors control the full Invoice 3 appearance and update instantly.',
-              )),
-              _ColorTile(
-                label: _t('لون هيدر الجدول (الفاتورة)', 'Invoice table header color'),
-                color: cfg.invoicePrimaryColor,
-                onPicked: (c) => controller.setInvoicePrimaryColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون الصفوف البديلة (الفاتورة)', 'Invoice alt row / stripe color'),
-                color: cfg.invoiceSecondaryColor,
-                onPicked: (c) => controller.setInvoiceSecondaryColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون العنوان والزوايا (الفاتورة)', 'Invoice title / corner accent'),
-                color: cfg.invoiceAccentColor,
-                onPicked: (c) => controller.setInvoiceAccentColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون النص الرئيسي (الفاتورة)', 'Invoice main text color'),
-                color: cfg.invoiceTextColor,
-                onPicked: (c) => controller.setInvoiceTextColor(c),
-              ),
-              _SectionTitle(_t('الأزرار', 'Buttons')),
-              _SectionHint(_t(
-                'هذه الإعدادات تؤثر على أزرار الإجراءات في الصفحة.',
-                'These settings affect action buttons on the page.',
-              )),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _t('خصائص التصميم الزجاجي', 'Glass design properties'),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _t(
-                          'هذا القسم يعطي مظهر زجاجي (Glass) عبر الحدود والشفافية واللمعة، بدون إجبار أي تغيير دائم إلا عند تطبيق.',
-                          'This section creates a glass look via border, opacity and shine, with no permanent change until Apply.',
-                        ),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF000000),
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: () {
-                              controller.preview(
-                                cfg.copyWith(
-                                  buttonPresetStyle: 2,
-                                  buttonShapeStyle: 0,
-                                  buttonBorderWidth: 1.2,
-                                  buttonRadius: 10,
-                                  buttonShadowBlur: 18,
-                                  buttonShadowOpacity: 0.3,
-                                  buttonShine: 0.42,
-                                  buttonBorderColor: const Color(0x8893C5DB),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.auto_awesome),
-                            label: Text(_t('تفعيل مظهر زجاجي جاهز',
-                                'Apply ready glass look')),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              controller.preview(
-                                cfg.copyWith(
-                                  buttonPresetStyle: 0,
-                                  buttonShadowBlur: 8,
-                                  buttonShadowOpacity: 0.12,
-                                  buttonShine: 0.1,
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.layers_clear),
-                            label: Text(_t('تقليل التأثير الزجاجي',
-                                'Reduce glass effect')),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SwitchListTile(
-                title: Text(_t('تمييز ألوان أزرار الإجراءات', 'Distinct action button colors')),
-                value: cfg.useDistinctActionButtonColors,
-                onChanged: (v) => controller.setUseDistinctActionButtonColors(v),
-              ),
-              Card(
-                child: ListTile(
-                  title: Text(_t('ستايل الزر الحديث', 'Modern button style')),
-                  trailing: DropdownButton<int>(
-                    value: cfg.buttonPresetStyle,
-                    items: [
-                      DropdownMenuItem(
-                          value: 0, child: Text(_t('مخصص', 'Custom'))),
-                      DropdownMenuItem(
-                          value: 1, child: Text(_t('Gradient', 'Gradient'))),
-                      DropdownMenuItem(
-                          value: 2, child: Text(_t('Glass', 'Glass'))),
-                      DropdownMenuItem(
-                          value: 3, child: Text(_t('Soft', 'Soft'))),
-                      DropdownMenuItem(
-                          value: 4, child: Text(_t('Minimal', 'Minimal'))),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) controller.setButtonPresetStyle(v);
-                    },
-                  ),
-                ),
-              ),
-              Card(
-                child: ListTile(
-                  title: Text(_t('شكل الأزرار', 'Button shape')),
-                  trailing: DropdownButton<int>(
-                    value: cfg.buttonShapeStyle,
-                    items: [
-                      DropdownMenuItem(
-                          value: 0, child: Text(_t('منحني', 'Rounded'))),
-                      DropdownMenuItem(value: 1, child: Text(_t('كبسولة', 'Pill'))),
-                      DropdownMenuItem(value: 2, child: Text(_t('مربع', 'Square'))),
-                      DropdownMenuItem(value: 3, child: Text(_t('ناعم جداً', 'Soft'))),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) controller.setButtonShapeStyle(v);
-                    },
-                  ),
-                ),
-              ),
-              _ColorTile(
-                label: _t('لون خلفية الأزرار', 'Button background color'),
-                color: cfg.buttonBgColor,
-                onPicked: (c) => controller.setButtonBgColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون نص الأزرار', 'Button text color'),
-                color: cfg.buttonTextColor,
-                onPicked: (c) => controller.setButtonTextColor(c),
-              ),
-              _ColorTile(
-                label: _t('لون حدود الأزرار', 'Button border color'),
-                color: cfg.buttonBorderColor,
-                onPicked: (c) => controller.setButtonBorderColor(c),
-              ),
-              _SliderTile(
-                label: _t('سماكة حدود الأزرار', 'Button border width'),
-                value: cfg.buttonBorderWidth,
-                min: 0,
-                max: 4,
-                onChanged: (v) => controller.setButtonBorderWidth(v),
-              ),
-              _SliderTile(
-                label: _t('استدارة الأزرار', 'Button corner radius'),
-                value: cfg.buttonRadius,
-                min: 0,
-                max: 24,
-                onChanged: (v) => controller.setButtonRadius(v),
-              ),
-              _SliderTile(
-                label: _t('قوة ضباب الزجاج (الظل)', 'Glass blur strength (shadow blur)'),
-                value: cfg.buttonShadowBlur,
-                min: 0,
-                max: 30,
-                onChanged: (v) => controller.setButtonShadowBlur(v),
-              ),
-              _SliderTile(
-                label: _t('شفافية الزجاج (الظل)', 'Glass opacity (shadow opacity)'),
-                value: cfg.buttonShadowOpacity,
-                min: 0,
-                max: 0.8,
-                onChanged: (v) => controller.setButtonShadowOpacity(v),
-              ),
-              _SliderTile(
-                label: _t('لمعة الزجاج', 'Glass shine intensity'),
-                value: cfg.buttonShine,
-                min: 0,
-                max: 1,
-                onChanged: (v) => controller.setButtonShine(v),
-              ),
-              if (cfg.useDistinctActionButtonColors) ...[
-                _ColorTile(
-                  label: _t('لون زر إضافة', 'Add button color'),
-                  color: cfg.actionAddButtonColor,
-                  onPicked: (c) => controller.setActionAddButtonColor(c),
-                ),
-                _ColorTile(
-                  label: _t('لون زر تعديل', 'Edit button color'),
-                  color: cfg.actionEditButtonColor,
-                  onPicked: (c) => controller.setActionEditButtonColor(c),
-                ),
-                _ColorTile(
-                  label: _t('لون زر حذف', 'Delete button color'),
-                  color: cfg.actionDeleteButtonColor,
-                  onPicked: (c) => controller.setActionDeleteButtonColor(c),
-                ),
-                _ColorTile(
-                  label: _t('لون زر الحالة', 'Status button color'),
-                  color: cfg.actionStatusButtonColor,
-                  onPicked: (c) => controller.setActionStatusButtonColor(c),
                 ),
               ],
-              Card(
-                child: ListTile(
-                  leading: Icon(
-                    controller.hasGoodContrast(
-                            controller.onColorFor(cfg.tableHeaderColor),
-                            cfg.tableHeaderColor)
-                        ? Icons.check_circle
-                        : Icons.warning_amber_rounded,
-                    color: controller.hasGoodContrast(
-                            controller.onColorFor(cfg.tableHeaderColor),
-                            cfg.tableHeaderColor)
-                        ? Colors.green
-                        : Colors.orange,
-                  ),
-                  title: Text(_t('فحص التباين', 'Contrast check')),
-                  subtitle: Text(
-                    _t(
-                      'يتم ضبط لون النص تلقائياً لضمان الوضوح.',
-                      'Text color is auto-adjusted for readability.',
+            ),
+
+            // ── Section 3: Sidebar & Customer Cards ────────────────────────
+            _CollapsibleSection(
+              title: _t('السايدبار وكروت العملاء', 'Sidebar & Customer Cards'),
+              icon: Icons.view_sidebar_rounded,
+              accentColor: const Color(0xFF6366F1),
+              children: [
+                _ColorTile(label: _t('لون خلفية السايدبار', 'Sidebar background'), color: cfg.sidebarColor, onPicked: (c) => controller.setSidebarColor(c)),
+                const Divider(height: 20),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(_t('تصميم كروت العملاء', 'Customer Card Design'),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF6366F1))),
+                ),
+                _ColorTile(label: _t('لون خلفية الكارت', 'Card background'), color: cfg.customerCardBgColor, onPicked: (c) => controller.setCustomerCardBgColor(c)),
+                _ColorTile(label: _t('لون النص', 'Text color'), color: cfg.customerCardTextColor, onPicked: (c) => controller.setCustomerCardTextColor(c)),
+                _ColorTile(label: _t('لون الحدود', 'Border color'), color: cfg.customerCardBorderColor, onPicked: (c) => controller.setCustomerCardBorderColor(c)),
+                _SliderTile(label: _t('حجم الخط', 'Font size'), value: cfg.customerCardFontSize, min: 9, max: 20, onChanged: (v) => controller.setCustomerCardFontSize(v)),
+                Card(
+                  child: ListTile(
+                    title: Text(_t('نوع الخط', 'Font family')),
+                    trailing: DropdownButton<String>(
+                      value: fontOptions.contains(cfg.customerCardFontFamily) ? cfg.customerCardFontFamily : 'Cairo',
+                      items: fontOptions.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+                      onChanged: (v) { if (v != null) controller.setCustomerCardFontFamily(v); },
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: controller.resetToDefaults,
-                      icon: const Icon(Icons.restore),
-                      label: Text(_t('استعادة الافتراضي (معاينة)',
-                          'Restore defaults (preview)')),
+                _SliderTile(label: _t('استدارة الزوايا', 'Border radius'), value: cfg.customerCardBorderRadius, min: 0, max: 24, onChanged: (v) => controller.setCustomerCardBorderRadius(v)),
+                _SliderTile(label: _t('سماكة الحدود', 'Border width'), value: cfg.customerCardBorderWidth, min: 0, max: 4, onChanged: (v) => controller.setCustomerCardBorderWidth(v)),
+                _SliderTile(label: _t('قوة الظل', 'Shadow blur'), value: cfg.customerCardShadowBlur, min: 0, max: 24, onChanged: (v) => controller.setCustomerCardShadowBlur(v)),
+                Card(
+                  child: ListTile(
+                    title: Text(_t('ستايل الكارت', 'Card style')),
+                    trailing: DropdownButton<int>(
+                      value: cfg.customerCardStyle,
+                      items: [
+                        DropdownMenuItem(value: 0, child: Text(_t('عادي', 'Flat'))),
+                        DropdownMenuItem(value: 1, child: Text(_t('مرتفع بظل', 'Elevated'))),
+                        DropdownMenuItem(value: 2, child: Text(_t('حدودي بارز', 'Bordered'))),
+                        DropdownMenuItem(value: 3, child: Text(_t('زجاجي', 'Glass'))),
+                      ],
+                      onChanged: (v) { if (v != null) controller.setCustomerCardStyle(v); },
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      icon: const Icon(Icons.close),
-                      label: Text(_t('إلغاء بدون حفظ', 'Cancel without saving')),
+                ),
+              ],
+            ),
+
+            // ── Section 4: Invoice ─────────────────────────────────────────
+            _CollapsibleSection(
+              title: _t('الفاتورة', 'Invoice'),
+              icon: Icons.receipt_long_rounded,
+              accentColor: const Color(0xFFF59E0B),
+              children: [
+                _ColorTile(label: _t('لون هيدر الجدول', 'Table header color'), color: cfg.invoicePrimaryColor, onPicked: (c) => controller.setInvoicePrimaryColor(c)),
+                _ColorTile(label: _t('لون الصفوف البديلة', 'Alt row color'), color: cfg.invoiceSecondaryColor, onPicked: (c) => controller.setInvoiceSecondaryColor(c)),
+                _ColorTile(label: _t('لون التمييز والعنوان', 'Accent / title color'), color: cfg.invoiceAccentColor, onPicked: (c) => controller.setInvoiceAccentColor(c)),
+                _ColorTile(label: _t('لون النص الرئيسي', 'Main text color'), color: cfg.invoiceTextColor, onPicked: (c) => controller.setInvoiceTextColor(c)),
+              ],
+            ),
+
+            // ── Section 5: Buttons ─────────────────────────────────────────
+            _CollapsibleSection(
+              title: _t('الأزرار', 'Buttons'),
+              icon: Icons.smart_button_rounded,
+              accentColor: const Color(0xFF10B981),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_t('خصائص التصميم الزجاجي', 'Glass design'),
+                            style: const TextStyle(fontWeight: FontWeight.w700, color: textBlack)),
+                        const SizedBox(height: 8),
+                        Wrap(spacing: 8, runSpacing: 6, children: [
+                          FilledButton.icon(
+                            onPressed: () => controller.preview(cfg.copyWith(
+                              buttonPresetStyle: 2, buttonShapeStyle: 0, buttonBorderWidth: 1.2,
+                              buttonRadius: 10, buttonShadowBlur: 18, buttonShadowOpacity: 0.3,
+                              buttonShine: 0.42, buttonBorderColor: const Color(0x8893C5DB),
+                            )),
+                            icon: const Icon(Icons.auto_awesome),
+                            label: Text(_t('تفعيل زجاجي', 'Apply glass')),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => controller.preview(cfg.copyWith(
+                              buttonPresetStyle: 0, buttonShadowBlur: 8,
+                              buttonShadowOpacity: 0.12, buttonShine: 0.1,
+                            )),
+                            icon: const Icon(Icons.layers_clear),
+                            label: Text(_t('تقليل الزجاج', 'Reduce glass')),
+                          ),
+                        ]),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () async {
-                        await controller.applyChanges();
-                        const appliedThemeName = 'Applied Theme';
-                        final savedThemes = await controller.getSavedThemes();
-                        final existing = savedThemes.where((t) => t.name == appliedThemeName);
-                        if (existing.isNotEmpty) {
-                          await controller.saveCurrentTheme(
-                            appliedThemeName,
-                            id: existing.first.id,
-                          );
-                        } else {
-                          await controller.saveCurrentTheme(appliedThemeName);
-                        }
-                        if (context.mounted) {
-                          Navigator.of(context).pop(true);
-                        }
-                      },
-                      icon: const Icon(Icons.check),
-                      label: Text(_t('تطبيق وحفظ', 'Apply & Save')),
+                ),
+                SwitchListTile(
+                  title: Text(_t('تمييز ألوان أزرار الإجراءات', 'Distinct action button colors')),
+                  value: cfg.useDistinctActionButtonColors,
+                  onChanged: (v) => controller.setUseDistinctActionButtonColors(v),
+                ),
+                Card(
+                  child: ListTile(
+                    title: Text(_t('ستايل الزر', 'Button style')),
+                    trailing: DropdownButton<int>(
+                      value: cfg.buttonPresetStyle,
+                      items: [0, 1, 2, 3, 4].map((v) => DropdownMenuItem(value: v, child: Text(['Custom', 'Gradient', 'Glass', 'Soft', 'Minimal'][v]))).toList(),
+                      onChanged: (v) { if (v != null) controller.setButtonPresetStyle(v); },
                     ),
                   ),
+                ),
+                Card(
+                  child: ListTile(
+                    title: Text(_t('شكل الأزرار', 'Button shape')),
+                    trailing: DropdownButton<int>(
+                      value: cfg.buttonShapeStyle,
+                      items: [
+                        DropdownMenuItem(value: 0, child: Text(_t('منحني', 'Rounded'))),
+                        DropdownMenuItem(value: 1, child: Text(_t('كبسولة', 'Pill'))),
+                        DropdownMenuItem(value: 2, child: Text(_t('مربع', 'Square'))),
+                        DropdownMenuItem(value: 3, child: Text(_t('ناعم', 'Soft'))),
+                      ],
+                      onChanged: (v) { if (v != null) controller.setButtonShapeStyle(v); },
+                    ),
+                  ),
+                ),
+                _ColorTile(label: _t('لون خلفية الأزرار', 'Button bg'), color: cfg.buttonBgColor, onPicked: (c) => controller.setButtonBgColor(c)),
+                _ColorTile(label: _t('لون نص الأزرار', 'Button text'), color: cfg.buttonTextColor, onPicked: (c) => controller.setButtonTextColor(c)),
+                _ColorTile(label: _t('لون حدود الأزرار', 'Button border'), color: cfg.buttonBorderColor, onPicked: (c) => controller.setButtonBorderColor(c)),
+                _SliderTile(label: _t('سماكة الحدود', 'Border width'), value: cfg.buttonBorderWidth, min: 0, max: 4, onChanged: (v) => controller.setButtonBorderWidth(v)),
+                _SliderTile(label: _t('استدارة الزوايا', 'Corner radius'), value: cfg.buttonRadius, min: 0, max: 24, onChanged: (v) => controller.setButtonRadius(v)),
+                _SliderTile(label: _t('قوة الظل', 'Shadow blur'), value: cfg.buttonShadowBlur, min: 0, max: 30, onChanged: (v) => controller.setButtonShadowBlur(v)),
+                _SliderTile(label: _t('شفافية الظل', 'Shadow opacity'), value: cfg.buttonShadowOpacity, min: 0, max: 0.8, onChanged: (v) => controller.setButtonShadowOpacity(v)),
+                _SliderTile(label: _t('لمعة الزجاج', 'Glass shine'), value: cfg.buttonShine, min: 0, max: 1, onChanged: (v) => controller.setButtonShine(v)),
+                if (cfg.useDistinctActionButtonColors) ...[
+                  _ColorTile(label: _t('زر إضافة', 'Add btn'), color: cfg.actionAddButtonColor, onPicked: (c) => controller.setActionAddButtonColor(c)),
+                  _ColorTile(label: _t('زر تعديل', 'Edit btn'), color: cfg.actionEditButtonColor, onPicked: (c) => controller.setActionEditButtonColor(c)),
+                  _ColorTile(label: _t('زر حذف', 'Delete btn'), color: cfg.actionDeleteButtonColor, onPicked: (c) => controller.setActionDeleteButtonColor(c)),
+                  _ColorTile(label: _t('زر الحالة', 'Status btn'), color: cfg.actionStatusButtonColor, onPicked: (c) => controller.setActionStatusButtonColor(c)),
                 ],
-              ),
-            ],
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Apply / Cancel / Reset ─────────────────────────────────────
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: controller.resetToDefaults,
+                    icon: const Icon(Icons.restore),
+                    label: Text(_t('الافتراضي', 'Defaults')),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    icon: const Icon(Icons.close),
+                    label: Text(_t('إلغاء', 'Cancel')),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: textBlack,
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      await controller.applyChanges();
+                      const appliedThemeName = 'Applied Theme';
+                      final savedThemes = await controller.getSavedThemes();
+                      final existing = savedThemes.where((t) => t.name == appliedThemeName);
+                      if (existing.isNotEmpty) {
+                        await controller.saveCurrentTheme(appliedThemeName, id: existing.first.id);
+                      } else {
+                        await controller.saveCurrentTheme(appliedThemeName);
+                      }
+                      if (context.mounted) Navigator.of(context).pop(true);
+                    },
+                    icon: const Icon(Icons.check),
+                    label: Text(_t('تطبيق وحفظ', 'Apply & Save')),
+                  ),
+                ),
+              ],
+            ),
+          ],
         );
+
         if (asOverlay) {
           return SafeArea(
             child: Align(
@@ -602,52 +424,38 @@ class DesignSettingsPage extends StatelessWidget {
                     color: panelBg,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [
-                      BoxShadow(
-                        color: neonAccentSoft,
-                        blurRadius: 20,
-                        offset: Offset(0, 6),
-                      ),
+                      BoxShadow(color: Color(0x18000000), blurRadius: 24, offset: Offset(0, 8)),
                     ],
                     border: Border.all(color: panelBorder),
                   ),
                   child: Column(
                     children: [
                       Container(
-                        height: 56,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: cfg.sidebarColor,
-                          borderRadius:
-                              const BorderRadius.vertical(top: Radius.circular(16)),
+                        height: 54,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
                         ),
                         child: Row(
                           children: [
+                            const Icon(Icons.design_services_rounded, color: Color(0xFF2563EB), size: 20),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _t('إعدادات التصميم', 'Design Settings'),
-                                style: const TextStyle(
-                                  color: textBlack,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                                style: const TextStyle(color: textBlack, fontSize: 15, fontWeight: FontWeight.w700),
                               ),
                             ),
                             IconButton(
                               onPressed: () => Navigator.of(context).pop(false),
-                              icon: const Icon(
-                                Icons.close,
-                                color: textBlack,
-                              ),
+                              icon: const Icon(Icons.close, color: textBlack, size: 20),
                             ),
                           ],
                         ),
                       ),
-                      Expanded(
-                        child: Theme(
-                          data: modernTheme,
-                          child: body,
-                        ),
-                      ),
+                      Expanded(child: Theme(data: modernTheme, child: body)),
                     ],
                   ),
                 ),
@@ -656,17 +464,124 @@ class DesignSettingsPage extends StatelessWidget {
           );
         }
         return Scaffold(
+          backgroundColor: panelBg,
           appBar: AppBar(
-            title: Text(_t('إعدادات التصميم', 'Design Settings')),
-            backgroundColor: cfg.sidebarColor,
+            backgroundColor: Colors.white,
             foregroundColor: textBlack,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent,
+            title: Text(_t('إعدادات التصميم', 'Design Settings'),
+                style: const TextStyle(color: textBlack, fontWeight: FontWeight.w700)),
+            bottom: const PreferredSize(
+              preferredSize: Size.fromHeight(1),
+              child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+            ),
           ),
-          body: Theme(
-            data: modernTheme,
-            child: body,
-          ),
+          body: Theme(data: modernTheme, child: body),
         );
       },
+    );
+  }
+}
+
+// ─── Collapsible section container ───────────────────────────────────────────
+class _CollapsibleSection extends StatefulWidget {
+  const _CollapsibleSection({
+    required this.title,
+    required this.icon,
+    required this.accentColor,
+    required this.children,
+    this.initiallyOpen = false,
+  });
+  final String title;
+  final IconData icon;
+  final Color accentColor;
+  final List<Widget> children;
+  final bool initiallyOpen;
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection> {
+  late bool _open;
+
+  @override
+  void initState() {
+    super.initState();
+    _open = widget.initiallyOpen;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: widget.accentColor.withOpacity(0.28)),
+        boxShadow: [
+          BoxShadow(
+            color: widget.accentColor.withOpacity(0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _open = !_open),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: _open ? widget.accentColor.withOpacity(0.08) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: widget.accentColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(widget.icon, color: widget.accentColor, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _open
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: widget.accentColor,
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: widget.children,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
