@@ -15,8 +15,15 @@ import '../logic/design_controller.dart';
 import '../logic/saved_invoices_store.dart';
 
 // ─── Derived soft text = text color at 60% opacity ────────────────────────
-Color _soft(Color base) => base.withOpacity(0.60);
-Color _brd(Color accent) => accent.withOpacity(0.35);
+Color _soft(Color base) => _mixOpaque(base, Colors.white, 0.34);
+Color _brd(Color accent) => Color.fromARGB(0x26, accent.red, accent.green, accent.blue);
+Color _mixOpaque(Color a, Color b, double t) {
+  final clamped = t.clamp(0.0, 1.0);
+  final r = (a.red + ((b.red - a.red) * clamped)).round();
+  final g = (a.green + ((b.green - a.green) * clamped)).round();
+  final bCh = (a.blue + ((b.blue - a.blue) * clamped)).round();
+  return Color.fromARGB(0xFF, r, g, bCh);
+}
 const List<String> _invoiceFontOptions = <String>[
   'Cairo',
   'Tajawal',
@@ -317,7 +324,7 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: secondary.withOpacity(0.4),
+        backgroundColor: _mixOpaque(secondary, Colors.white, 0.4),
         appBar: AppBar(
           backgroundColor: accent,
           foregroundColor: Colors.white,
@@ -505,7 +512,7 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
                 children: [
                   Container(height: 1.4, color: accent),
                   const SizedBox(height: 3),
-                  Container(height: 1.0, color: accent.withOpacity(0.65)),
+                  Container(height: 1.0, color: _mixOpaque(accent, Colors.white, 0.18)),
                 ],
               ),
             ),
@@ -597,7 +604,7 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: accent.withOpacity(0.05),
+        color: _mixOpaque(Colors.white, accent, 0.07),
         border: Border.all(color: borderColor),
         borderRadius: BorderRadius.circular(6),
       ),
@@ -718,7 +725,7 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
         width: 320,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: accent.withOpacity(0.04),
+          color: _mixOpaque(Colors.white, accent, 0.06),
           border: Border.all(color: borderColor),
           borderRadius: BorderRadius.circular(6),
         ),

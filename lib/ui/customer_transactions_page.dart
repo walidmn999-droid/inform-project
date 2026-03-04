@@ -884,7 +884,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
       animation: _design,
       builder: (context, _) {
         final cfg = _design.config;
-        Color tone(Color c) => _design.shiftColor(c, cfg.uiBrightnessShift);
+        Color tone(Color c) => _opaqueColor(_design.shiftColor(c, cfg.uiBrightnessShift));
         final addBtn = cfg.useDistinctActionButtonColors
             ? cfg.actionAddButtonColor
             : cfg.buttonBgColor;
@@ -901,7 +901,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
             width: headerCardWidth,
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
             decoration: BoxDecoration(
-              color: tone(cfg.sidebarColor).withOpacity(0.9),
+              color: _shiftOpaque(_design, cfg.sidebarColor, -0.04),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0x265AA8FF)),
             ),
@@ -956,7 +956,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
             height: headerCardHeight,
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
             decoration: BoxDecoration(
-              color: tone(cfg.tableHeaderColor).withOpacity(0.92),
+              color: _shiftOpaque(_design, cfg.tableHeaderColor, -0.03),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0x334AA3FF)),
             ),
@@ -1197,13 +1197,12 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                   final cardStyle   = cfg.customerCardStyle;
 
                                   final resolvedBg = selected
-                                      ? Color.alphaBlend(const Color(0x3360A5FA), cardBgBase)
-                                      : cardBgBase;
+                                      ? _shiftOpaque(_design, cardBgBase, 0.12)
+                                      : _opaqueColor(cardBgBase);
                                   final resolvedBorder = selected
                                       ? const Color(0xFF60A5FA)
                                       : cardBorder;
-                                  final subTextColor = Color.alphaBlend(
-                                      const Color(0x88FFFFFF), cardText);
+                                  final subTextColor = _shiftOpaque(_design, cardText, 0.16);
 
                                   BoxDecoration cardDeco;
                                   switch (cardStyle) {
@@ -1223,9 +1222,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                       );
                                     case 3: // Glass
                                       cardDeco = BoxDecoration(
-                                        color: resolvedBg.withOpacity(0.6),
+                                        color: _shiftOpaque(_design, resolvedBg, 0.10),
                                         borderRadius: BorderRadius.circular(cardRadius),
-                                        border: Border.all(color: resolvedBorder.withOpacity(0.5), width: cardBdrW),
+                                        border: Border.all(color: _opaqueColor(resolvedBorder).withAlpha(0x26), width: cardBdrW),
                                         boxShadow: cardShadow > 0 ? [BoxShadow(color: cardBgBase.withOpacity(0.15), blurRadius: cardShadow)] : null,
                                       );
                                     default: // 0: Flat
@@ -1588,7 +1587,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                           color: isSelected
                                               ? tone(cfg.buttonBgColor)
                                               : tone(cfg.tableHeaderColor)
-                                                  .withOpacity(0.28),
+                                                  .withAlpha(0x26),
                                           width: cfg.cardBorderWidth + 0.9,
                                         ),
                                         borderRadius: BorderRadius.circular(10),
@@ -1717,11 +1716,11 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                     end: 6,
                                     child: DecoratedBox(
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.92),
+                                        color: const Color(0xFFFFFFFF),
                                         borderRadius: BorderRadius.circular(999),
                                         border: Border.all(
                                           color: tone(cfg.tableHeaderColor)
-                                              .withOpacity(0.26),
+                                              .withAlpha(0x26),
                                         ),
                                       ),
                                       child: SizedBox(
@@ -1923,68 +1922,24 @@ class _ButtonVisual {
 
 _ButtonVisual _resolveButtonVisual(AppDesignConfig cfg, Color base) {
   final controller = DesignController.instance;
-  final shine = cfg.buttonShine.clamp(0.0, 1.0);
-  final blur = cfg.buttonShadowBlur.clamp(0.0, 30.0);
-  final shadowOpacity = cfg.buttonShadowOpacity.clamp(0.0, 0.8);
-  final dark = controller.shiftColor(base, -0.12);
-  final light = controller.shiftColor(base, 0.12);
-  final shadow = BoxShadow(
-    color: base.withOpacity(shadowOpacity),
-    blurRadius: blur,
-    offset: Offset(0, (2 + blur / 10).clamp(2, 6)),
+  final solidBase = _opaqueColor(base);
+  final subtleShadow = BoxShadow(
+    color: const Color(0x26000000),
+    blurRadius: cfg.buttonShadowBlur.clamp(0.0, 30.0),
+    offset: const Offset(0, 2),
   );
-
-  return switch (cfg.buttonPresetStyle) {
-    1 => _ButtonVisual(
-        color: null,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [light, dark],
-        ),
-        shadows: [shadow],
-      ),
-    2 => _ButtonVisual(
-        color: null,
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color.alphaBlend(Colors.white.withOpacity(0.20 + (shine * 0.22)), base),
-            Color.alphaBlend(Colors.white.withOpacity(0.02 + (shine * 0.06)), dark),
-          ],
-        ),
-        shadows: [
-          shadow,
-          BoxShadow(
-            color: Colors.white.withOpacity(0.08 + (shine * 0.16)),
-            blurRadius: 6,
-            offset: const Offset(0, -1),
-          ),
-        ],
-      ),
-    3 => _ButtonVisual(
-        color: controller.shiftColor(base, 0.08),
-        gradient: null,
-        shadows: [
-          BoxShadow(
-            color: base.withOpacity((shadowOpacity * 0.65).clamp(0, 0.8)),
-            blurRadius: (blur * 0.6).clamp(0, 30),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-    4 => _ButtonVisual(
-        color: Color.alphaBlend(Colors.white.withOpacity(0.08), base),
-        gradient: null,
-        shadows: const [],
-      ),
-    _ => _ButtonVisual(
-        color: base,
-        gradient: null,
-        shadows: [shadow],
-      ),
+  final toneAdjusted = switch (cfg.buttonPresetStyle) {
+    1 => _shiftOpaque(controller, solidBase, 0.05),
+    2 => _shiftOpaque(controller, solidBase, -0.03),
+    3 => _shiftOpaque(controller, solidBase, 0.08),
+    4 => _shiftOpaque(controller, solidBase, -0.07),
+    _ => solidBase,
   };
+  return _ButtonVisual(
+    color: toneAdjusted,
+    gradient: null,
+    shadows: cfg.buttonShadowBlur > 0 ? [subtleShadow] : const <BoxShadow>[],
+  );
 }
 
 class _SideItem extends StatelessWidget {
@@ -2112,12 +2067,17 @@ class _ActionBtn extends StatelessWidget {
           ),
         ).copyWith(
           overlayColor:
-              WidgetStatePropertyAll(hover.withOpacity(0.12 + (cfg.buttonShine * 0.22))),
+              WidgetStatePropertyAll(_shiftOpaque(controller, hover, -0.14).withAlpha(0x1A)),
         ),
       ),
     );
   }
 }
+
+Color _opaqueColor(Color c) => Color.fromARGB(0xFF, c.red, c.green, c.blue);
+
+Color _shiftOpaque(DesignController controller, Color base, double delta) =>
+    _opaqueColor(controller.shiftColor(base, delta));
 
 class _HeaderCell extends StatelessWidget {
   const _HeaderCell(this.text, this.flex, {this.align = TextAlign.start});

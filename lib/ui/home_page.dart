@@ -533,7 +533,9 @@ class _HeaderButton extends StatelessWidget {
         minimumSize: const Size(0, 36),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ).copyWith(
-        overlayColor: WidgetStatePropertyAll(hoverColor.withOpacity(0.20)),
+        overlayColor: WidgetStatePropertyAll(
+          Color.fromARGB(0x1A, hoverColor.red, hoverColor.green, hoverColor.blue),
+        ),
       ),
     );
   }
@@ -563,7 +565,7 @@ class _CentralBanner extends StatelessWidget {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  colors: <Color>[Color(0x262563EB), Colors.transparent],
+                  colors: <Color>[Color(0xFF2B6CB0), Color(0xFF2563EB)],
                   radius: 0.7,
                   center: Alignment.center,
                 ),
@@ -646,20 +648,19 @@ class _CustomerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onOpen,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
           ),
           boxShadow: [
             BoxShadow(
-              color: isSelected
-                  ? const Color(0x262563EB)
-                  : const Color(0x140F172A),
-              blurRadius: isSelected ? 16 : 8,
+              color: isSelected ? const Color(0x262563EB) : const Color(0x140F172A),
+              blurRadius: isSelected ? 18 : 8,
               offset: const Offset(0, 4),
             ),
           ],

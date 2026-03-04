@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../logic/design_controller.dart';
 
+Color _mixOpaque(Color a, Color b, double t) {
+  final clamped = t.clamp(0.0, 1.0);
+  final r = (a.red + ((b.red - a.red) * clamped)).round();
+  final g = (a.green + ((b.green - a.green) * clamped)).round();
+  final bCh = (a.blue + ((b.blue - a.blue) * clamped)).round();
+  return Color.fromARGB(0xFF, r, g, bCh);
+}
+
 class DesignSettingsPage extends StatelessWidget {
   const DesignSettingsPage({
     super.key,
@@ -836,7 +844,14 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: widget.accentColor.withOpacity(0.28)),
+        border: Border.all(
+          color: Color.fromARGB(
+            0x26,
+            widget.accentColor.red,
+            widget.accentColor.green,
+            widget.accentColor.blue,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
             color: widget.accentColor.withOpacity(0.06),
@@ -853,7 +868,9 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: _open ? widget.accentColor.withOpacity(0.08) : Colors.white,
+                color: _open
+                    ? _mixOpaque(Colors.white, widget.accentColor, 0.08)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -862,7 +879,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: widget.accentColor.withOpacity(0.12),
+                      color: _mixOpaque(Colors.white, widget.accentColor, 0.12),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(widget.icon, color: widget.accentColor, size: 18),
@@ -1263,9 +1280,16 @@ class _BrightnessIndicator extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _chipColor().withOpacity(0.12),
+                    color: _mixOpaque(Colors.white, _chipColor(), 0.12),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: _chipColor().withOpacity(0.4)),
+                    border: Border.all(
+                      color: Color.fromARGB(
+                        0x26,
+                        _chipColor().red,
+                        _chipColor().green,
+                        _chipColor().blue,
+                      ),
+                    ),
                   ),
                   child: Text(
                     '${_label()}  ${value.toStringAsFixed(2)}',

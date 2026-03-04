@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../logic/customer_transactions_logic.dart';
+import '../logic/saved_invoices_store.dart';
 import 'customer_transactions_page.dart';
 import 'invoice3_summary_page.dart';
 import 'invoice_print_page.dart';
@@ -83,8 +84,79 @@ class _InvoicesPageState extends State<InvoicesPage> {
           customerNameAr: widget.customerNameAr,
           customerNameEn: widget.customerNameEn,
           transactions: source,
+          customerId: widget.customerId,
         ),
       ),
+    );
+  }
+
+  String _fmtMoney(double v) {
+    final parts = v.toStringAsFixed(2).split('.');
+    final sb = StringBuffer();
+    for (int i = 0; i < parts[0].length; i++) {
+      if (i > 0 && (parts[0].length - i) % 3 == 0) sb.write(',');
+      sb.write(parts[0][i]);
+    }
+    return '${sb.toString()}.${parts[1]}';
+  }
+
+  void _openSavedInvoices() {
+    final saved = SavedInvoicesStore.instance.items;
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(_t('الفواتير المحفوظة', 'Saved Invoices')),
+          content: SizedBox(
+            width: 640,
+            child: saved.isEmpty
+                ? Center(
+                    child: Text(_t('لا توجد فواتير محفوظة', 'No saved invoices yet')),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: saved.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, i) {
+                      final entry = saved[i];
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          '${entry.invoiceNumber} • ${_fmtMoney(entry.grandTotal)}',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text(
+                          '${_isArabic ? entry.customerNameAr : entry.customerNameEn} • ${entry.invoiceDate}',
+                        ),
+                        trailing: FilledButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Navigator.of(this.context).push(
+                              MaterialPageRoute(
+                                builder: (_) => Invoice3SummaryPage(
+                                  isArabic: _isArabic,
+                                  customerNameAr: entry.customerNameAr,
+                                  customerNameEn: entry.customerNameEn,
+                                  transactions: entry.transactions,
+                                  customerId: entry.customerId,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(_t('فتح', 'Open')),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(_t('إغلاق', 'Close')),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -246,6 +318,7 @@ class _InvoicesPageState extends State<InvoicesPage> {
                                   label: _t('الفواتير المحفوظة',
                                       'Saved Invoices'),
                                   color: const Color(0xFF16A34A),
+                                  onPressed: _openSavedInvoices,
                                 ),
                                 _TopActionButton(
                                   label: _t('التجميع النهائي',
@@ -428,27 +501,27 @@ class _InvoicesPageState extends State<InvoicesPage> {
                                                     ),
                                                   ),
                                                   DataCell(
-                                                    Container(
+                                                    Builder(builder: (context) {
+                                                      final statusColor = _statusColor(
+                                                        _logic.transactions[i].status,
+                                                      );
+                                                      final statusBg = Color.lerp(
+                                                        Colors.white,
+                                                        statusColor,
+                                                        0.14,
+                                                      )!;
+                                                      return Container(
                                                       padding: const EdgeInsets
                                                           .symmetric(
                                                           horizontal: 10,
                                                           vertical: 4),
                                                       decoration: BoxDecoration(
-                                                        color: _statusColor(
-                                                                _logic
-                                                                    .transactions[
-                                                                        i]
-                                                                    .status)
-                                                            .withOpacity(0.12),
+                                                        color: statusBg,
                                                         borderRadius:
                                                             BorderRadius
                                                                 .circular(20),
                                                         border: Border.all(
-                                                          color: _statusColor(
-                                                              _logic
-                                                                  .transactions[
-                                                                      i]
-                                                                  .status),
+                                                          color: statusColor,
                                                           width: 1,
                                                         ),
                                                       ),
@@ -456,17 +529,14 @@ class _InvoicesPageState extends State<InvoicesPage> {
                                                         _logic.transactions[i]
                                                             .status,
                                                         style: TextStyle(
-                                                          color: _statusColor(
-                                                              _logic
-                                                                  .transactions[
-                                                                      i]
-                                                                  .status),
+                                                          color: statusColor,
                                                           fontSize: 12,
                                                           fontWeight:
                                                               FontWeight.w600,
                                                         ),
                                                       ),
-                                                    ),
+                                                    );
+                                                    }),
                                                   ),
                                                   DataCell(
                                                     SizedBox(

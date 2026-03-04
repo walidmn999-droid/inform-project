@@ -141,25 +141,32 @@ class AppDesignConfig {
   }
 
   /// Surface tone colors derived from tableAreaColor and surfaceToneLevel
-  Color get surface0 => tableAreaColor;
+  Color get surface0 => _forceOpaque(tableAreaColor);
   Color get surface1 {
-    if (surfaceToneLevel == 0) return tableAreaColor;
-    return _lerpBrightness(tableAreaColor, 0.04 * surfaceToneLevel);
+    final base = _forceOpaque(tableAreaColor);
+    if (surfaceToneLevel == 0) return base;
+    return _lerpBrightness(base, 0.08 * surfaceToneLevel);
   }
   Color get surface2 {
-    if (surfaceToneLevel == 0) return tableHeaderColor;
-    return _lerpBrightness(tableHeaderColor, 0.06 * surfaceToneLevel);
+    final base = _forceOpaque(transactionCardColor);
+    if (surfaceToneLevel == 0) return base;
+    return _lerpBrightness(base, 0.04 * surfaceToneLevel);
   }
   Color get surface3 {
-    if (surfaceToneLevel == 0) return transactionCardColor;
-    return _lerpBrightness(transactionCardColor, 0.09 * surfaceToneLevel);
+    final base = _forceOpaque(transactionCardColor);
+    if (surfaceToneLevel == 0) return _lerpBrightness(base, 0.07);
+    return _lerpBrightness(base, 0.10 + (0.04 * surfaceToneLevel));
   }
 
+  static Color _forceOpaque(Color c) =>
+      Color.fromARGB(0xFF, c.red, c.green, c.blue);
+
   static Color _lerpBrightness(Color c, double delta) {
+    final base = _forceOpaque(c);
     final r = (c.red + (delta * 255).round()).clamp(0, 255);
     final g = (c.green + (delta * 255).round()).clamp(0, 255);
     final b = (c.blue + (delta * 255).round()).clamp(0, 255);
-    return Color.fromARGB(c.alpha, r, g, b);
+    return Color.fromARGB(base.alpha, r, g, b);
   }
 
   static const AppDesignConfig defaults = AppDesignConfig(
