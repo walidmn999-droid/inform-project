@@ -34,6 +34,7 @@ class AppDesignConfig {
     required this.invoiceSecondaryColor,
     required this.invoiceAccentColor,
     required this.invoiceTextColor,
+    required this.invoiceFontFamily,
     required this.customerCardBgColor,
     required this.customerCardTextColor,
     required this.customerCardFontSize,
@@ -43,6 +44,15 @@ class AppDesignConfig {
     required this.customerCardBorderWidth,
     required this.customerCardShadowBlur,
     required this.customerCardStyle,
+    required this.seedColor,
+    required this.borderRadiusLevel,
+    required this.densityLevel,
+    required this.glassBlurStrength,
+    required this.enableGlassmorphism,
+    required this.surfaceToneLevel,
+    required this.columnSpacingH,
+    required this.cellPaddingH,
+    required this.useTabularFigures,
   });
 
   final Color tableHeaderColor;
@@ -77,6 +87,7 @@ class AppDesignConfig {
   final Color invoiceSecondaryColor;
   final Color invoiceAccentColor;
   final Color invoiceTextColor;
+  final String invoiceFontFamily;
   final Color customerCardBgColor;
   final Color customerCardTextColor;
   final double customerCardFontSize;
@@ -86,6 +97,70 @@ class AppDesignConfig {
   final double customerCardBorderWidth;
   final double customerCardShadowBlur;
   final int customerCardStyle;
+
+  // ─── New appearance system fields ───────────────────────────────────────────
+  final Color seedColor;
+  /// 0 = None, 1 = Medium (8px), 2 = Extra Round (20px)
+  final int borderRadiusLevel;
+  /// 0 = Compact, 1 = Normal, 2 = Spacious
+  final int densityLevel;
+  /// Blur strength for glassmorphism backgrounds (0 = disabled)
+  final double glassBlurStrength;
+  final bool enableGlassmorphism;
+  /// 0-3: depth of surface tone layering (0 = flat, 3 = deep)
+  final int surfaceToneLevel;
+  /// Horizontal spacing between table columns (px)
+  final double columnSpacingH;
+  /// Horizontal cell padding inside table cells
+  final double cellPaddingH;
+  /// Use tabular (monospaced) figures for numeric columns
+  final bool useTabularFigures;
+
+  // ─── Computed getters ────────────────────────────────────────────────────────
+  /// Resolved global border radius from level
+  double get globalRadius {
+    switch (borderRadiusLevel) {
+      case 0: return 0;
+      case 2: return 20;
+      default: return 8;
+    }
+  }
+
+  /// Row height multiplied by density factor
+  double get effectiveRowHeight {
+    const f = [0.82, 1.0, 1.28];
+    final factor = densityLevel.clamp(0, 2);
+    return transactionRowHeight * f[factor];
+  }
+
+  /// Vertical padding multiplied by density factor
+  double get effectiveRowPadding {
+    const f = [0.6, 1.0, 1.4];
+    final factor = densityLevel.clamp(0, 2);
+    return rowVerticalPadding * f[factor];
+  }
+
+  /// Surface tone colors derived from tableAreaColor and surfaceToneLevel
+  Color get surface0 => tableAreaColor;
+  Color get surface1 {
+    if (surfaceToneLevel == 0) return tableAreaColor;
+    return _lerpBrightness(tableAreaColor, 0.04 * surfaceToneLevel);
+  }
+  Color get surface2 {
+    if (surfaceToneLevel == 0) return tableHeaderColor;
+    return _lerpBrightness(tableHeaderColor, 0.06 * surfaceToneLevel);
+  }
+  Color get surface3 {
+    if (surfaceToneLevel == 0) return transactionCardColor;
+    return _lerpBrightness(transactionCardColor, 0.09 * surfaceToneLevel);
+  }
+
+  static Color _lerpBrightness(Color c, double delta) {
+    final r = (c.red + (delta * 255).round()).clamp(0, 255);
+    final g = (c.green + (delta * 255).round()).clamp(0, 255);
+    final b = (c.blue + (delta * 255).round()).clamp(0, 255);
+    return Color.fromARGB(c.alpha, r, g, b);
+  }
 
   static const AppDesignConfig defaults = AppDesignConfig(
     tableHeaderColor: Color(0xFF1E293B),
@@ -120,6 +195,7 @@ class AppDesignConfig {
     invoiceSecondaryColor: Color(0xFFE9EDF2),
     invoiceAccentColor: Color(0xFF6F8297),
     invoiceTextColor: Color(0xFF243241),
+    invoiceFontFamily: 'Cairo',
     customerCardBgColor: Color(0xFF1E293B),
     customerCardTextColor: Color(0xFFE2E8F0),
     customerCardFontSize: 12,
@@ -129,6 +205,15 @@ class AppDesignConfig {
     customerCardBorderWidth: 1.0,
     customerCardShadowBlur: 0,
     customerCardStyle: 0,
+    seedColor: Color(0xFF22D3EE),
+    borderRadiusLevel: 1,
+    densityLevel: 1,
+    glassBlurStrength: 0,
+    enableGlassmorphism: false,
+    surfaceToneLevel: 1,
+    columnSpacingH: 8,
+    cellPaddingH: 12,
+    useTabularFigures: false,
   );
 
   AppDesignConfig copyWith({
@@ -164,6 +249,7 @@ class AppDesignConfig {
     Color? invoiceSecondaryColor,
     Color? invoiceAccentColor,
     Color? invoiceTextColor,
+    String? invoiceFontFamily,
     Color? customerCardBgColor,
     Color? customerCardTextColor,
     double? customerCardFontSize,
@@ -173,6 +259,15 @@ class AppDesignConfig {
     double? customerCardBorderWidth,
     double? customerCardShadowBlur,
     int? customerCardStyle,
+    Color? seedColor,
+    int? borderRadiusLevel,
+    int? densityLevel,
+    double? glassBlurStrength,
+    bool? enableGlassmorphism,
+    int? surfaceToneLevel,
+    double? columnSpacingH,
+    double? cellPaddingH,
+    bool? useTabularFigures,
   }) {
     return AppDesignConfig(
       tableHeaderColor: tableHeaderColor ?? this.tableHeaderColor,
@@ -208,6 +303,7 @@ class AppDesignConfig {
       invoiceSecondaryColor: invoiceSecondaryColor ?? this.invoiceSecondaryColor,
       invoiceAccentColor: invoiceAccentColor ?? this.invoiceAccentColor,
       invoiceTextColor: invoiceTextColor ?? this.invoiceTextColor,
+      invoiceFontFamily: invoiceFontFamily ?? this.invoiceFontFamily,
       customerCardBgColor: customerCardBgColor ?? this.customerCardBgColor,
       customerCardTextColor: customerCardTextColor ?? this.customerCardTextColor,
       customerCardFontSize: _clamp(customerCardFontSize ?? this.customerCardFontSize, 9, 20),
@@ -217,6 +313,15 @@ class AppDesignConfig {
       customerCardBorderWidth: _clamp(customerCardBorderWidth ?? this.customerCardBorderWidth, 0, 4),
       customerCardShadowBlur: _clamp(customerCardShadowBlur ?? this.customerCardShadowBlur, 0, 24),
       customerCardStyle: (customerCardStyle ?? this.customerCardStyle).clamp(0, 3).toInt(),
+      seedColor: seedColor ?? this.seedColor,
+      borderRadiusLevel: (borderRadiusLevel ?? this.borderRadiusLevel).clamp(0, 2).toInt(),
+      densityLevel: (densityLevel ?? this.densityLevel).clamp(0, 2).toInt(),
+      glassBlurStrength: _clamp(glassBlurStrength ?? this.glassBlurStrength, 0, 40),
+      enableGlassmorphism: enableGlassmorphism ?? this.enableGlassmorphism,
+      surfaceToneLevel: (surfaceToneLevel ?? this.surfaceToneLevel).clamp(0, 3).toInt(),
+      columnSpacingH: _clamp(columnSpacingH ?? this.columnSpacingH, 0, 32),
+      cellPaddingH: _clamp(cellPaddingH ?? this.cellPaddingH, 4, 40),
+      useTabularFigures: useTabularFigures ?? this.useTabularFigures,
     );
   }
 
@@ -254,6 +359,7 @@ class AppDesignConfig {
       'invoiceSecondaryColor': invoiceSecondaryColor.value,
       'invoiceAccentColor': invoiceAccentColor.value,
       'invoiceTextColor': invoiceTextColor.value,
+      'invoiceFontFamily': invoiceFontFamily,
       'customerCardBgColor': customerCardBgColor.value,
       'customerCardTextColor': customerCardTextColor.value,
       'customerCardFontSize': customerCardFontSize,
@@ -263,6 +369,15 @@ class AppDesignConfig {
       'customerCardBorderWidth': customerCardBorderWidth,
       'customerCardShadowBlur': customerCardShadowBlur,
       'customerCardStyle': customerCardStyle,
+      'seedColor': seedColor.value,
+      'borderRadiusLevel': borderRadiusLevel,
+      'densityLevel': densityLevel,
+      'glassBlurStrength': glassBlurStrength,
+      'enableGlassmorphism': enableGlassmorphism ? 1 : 0,
+      'surfaceToneLevel': surfaceToneLevel,
+      'columnSpacingH': columnSpacingH,
+      'cellPaddingH': cellPaddingH,
+      'useTabularFigures': useTabularFigures ? 1 : 0,
     };
   }
 
@@ -329,6 +444,9 @@ class AppDesignConfig {
           _colorOrDefault(json['invoiceAccentColor'], defaults.invoiceAccentColor),
       invoiceTextColor:
           _colorOrDefault(json['invoiceTextColor'], defaults.invoiceTextColor),
+      invoiceFontFamily: (json['invoiceFontFamily'] as String?)?.trim().isNotEmpty == true
+          ? json['invoiceFontFamily'] as String
+          : defaults.invoiceFontFamily,
       customerCardBgColor:
           _colorOrDefault(json['customerCardBgColor'], defaults.customerCardBgColor),
       customerCardTextColor:
@@ -351,6 +469,26 @@ class AppDesignConfig {
           _doubleOrDefault(json['customerCardStyle'], defaults.customerCardStyle.toDouble())
               .toInt()
               .clamp(0, 3),
+      seedColor: _colorOrDefault(json['seedColor'], defaults.seedColor),
+      borderRadiusLevel:
+          _doubleOrDefault(json['borderRadiusLevel'], defaults.borderRadiusLevel.toDouble())
+              .toInt().clamp(0, 2),
+      densityLevel:
+          _doubleOrDefault(json['densityLevel'], defaults.densityLevel.toDouble())
+              .toInt().clamp(0, 2),
+      glassBlurStrength:
+          _doubleOrDefault(json['glassBlurStrength'], defaults.glassBlurStrength),
+      enableGlassmorphism:
+          _doubleOrDefault(json['enableGlassmorphism'], 0) > 0,
+      surfaceToneLevel:
+          _doubleOrDefault(json['surfaceToneLevel'], defaults.surfaceToneLevel.toDouble())
+              .toInt().clamp(0, 3),
+      columnSpacingH:
+          _doubleOrDefault(json['columnSpacingH'], defaults.columnSpacingH),
+      cellPaddingH:
+          _doubleOrDefault(json['cellPaddingH'], defaults.cellPaddingH),
+      useTabularFigures:
+          _doubleOrDefault(json['useTabularFigures'], 0) > 0,
     );
   }
 

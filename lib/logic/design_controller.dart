@@ -201,6 +201,8 @@ class DesignController extends ChangeNotifier {
       _previewUpdate(_config.copyWith(invoiceAccentColor: value));
   Future<void> setInvoiceTextColor(Color value) =>
       _previewUpdate(_config.copyWith(invoiceTextColor: value));
+  Future<void> setInvoiceFontFamily(String value) =>
+      _previewUpdate(_config.copyWith(invoiceFontFamily: value));
   Future<void> setCustomerCardBgColor(Color value) =>
       _previewUpdate(_config.copyWith(customerCardBgColor: value));
   Future<void> setCustomerCardTextColor(Color value) =>
@@ -219,6 +221,58 @@ class DesignController extends ChangeNotifier {
       _previewUpdate(_config.copyWith(customerCardShadowBlur: value));
   Future<void> setCustomerCardStyle(int value) =>
       _previewUpdate(_config.copyWith(customerCardStyle: value));
+
+  // ─── Appearance system setters ───────────────────────────────────────────
+  Future<void> setSeedColor(Color value) =>
+      _previewUpdate(_config.copyWith(seedColor: value));
+  Future<void> setBorderRadiusLevel(int value) =>
+      _previewUpdate(_config.copyWith(borderRadiusLevel: value));
+  Future<void> setDensityLevel(int value) =>
+      _previewUpdate(_config.copyWith(densityLevel: value));
+  Future<void> setGlassBlurStrength(double value) =>
+      _previewUpdate(_config.copyWith(glassBlurStrength: value));
+  Future<void> setEnableGlassmorphism(bool value) =>
+      _previewUpdate(_config.copyWith(enableGlassmorphism: value));
+  Future<void> setSurfaceToneLevel(int value) =>
+      _previewUpdate(_config.copyWith(surfaceToneLevel: value));
+  Future<void> setColumnSpacingH(double value) =>
+      _previewUpdate(_config.copyWith(columnSpacingH: value));
+  Future<void> setCellPaddingH(double value) =>
+      _previewUpdate(_config.copyWith(cellPaddingH: value));
+  Future<void> setUseTabularFigures(bool value) =>
+      _previewUpdate(_config.copyWith(useTabularFigures: value));
+
+  /// Derive a full palette from [seed] — generates harmonious color set.
+  Future<void> generateFromSeed(Color seed) {
+    final hsl = HSLColor.fromColor(seed);
+    final h = hsl.hue;
+    Color tone(double lShift, double sShift) {
+      final l = (hsl.lightness + lShift).clamp(0.0, 1.0);
+      final s = (hsl.saturation + sShift).clamp(0.0, 1.0);
+      return HSLColor.fromAHSL(1.0, h, s, l).toColor();
+    }
+    Color comp(double hueDelta, double l, double s) {
+      final nh = (h + hueDelta) % 360;
+      return HSLColor.fromAHSL(1.0, nh, s.clamp(0.0, 1.0), l.clamp(0.0, 1.0)).toColor();
+    }
+    final isDark = hsl.lightness < 0.35;
+    return _previewUpdate(_config.copyWith(
+      seedColor: seed,
+      tableHeaderColor: tone(isDark ? 0.06 : -0.12, 0.05),
+      tableAreaColor: tone(isDark ? 0.02 : -0.20, 0.02),
+      transactionCardColor: tone(isDark ? 0.08 : -0.10, 0.04),
+      sidebarColor: tone(isDark ? 0.01 : -0.22, 0.03),
+      buttonBgColor: seed,
+      buttonTextColor: onColorFor(seed),
+      buttonBorderColor: seed.withOpacity(0.5),
+      actionAddButtonColor: comp(120, 0.45, 0.6),
+      actionEditButtonColor: comp(0, hsl.lightness + 0.1, hsl.saturation),
+      actionDeleteButtonColor: comp(0, 0.48, 0.75),
+      actionStatusButtonColor: comp(40, 0.55, 0.8),
+      customerCardBgColor: tone(isDark ? 0.06 : -0.14, 0.04),
+      customerCardTextColor: onColorFor(tone(isDark ? 0.06 : -0.14, 0.04)),
+    ));
+  }
 
   Future<List<SavedDesignTheme>> getSavedThemes() async {
     final list = await _loadSavedThemes();
@@ -311,6 +365,12 @@ class DesignController extends ChangeNotifier {
   }
 
   static const List<String> paletteIds = <String>[
+    'light_mood',
+    'indigo_pro',
+    'slate_modern',
+    'emerald_finance',
+    'rose_luxury',
+    'dark_mode',
     'new_theme_linked',
     'linear_midnight',
     'arctic_neon',
@@ -320,23 +380,189 @@ class DesignController extends ChangeNotifier {
 
   static String paletteTitle(String id) {
     switch (id) {
-      case 'new_theme_linked':
-        return 'New Theme (Linked)';
-      case 'linear_midnight':
-        return 'Linear Midnight';
-      case 'arctic_neon':
-        return 'Arctic Neon';
-      case 'ocean_glow':
-        return 'Ocean Glow';
-      case 'slate_pro':
-        return 'Slate Pro';
-      default:
-        return 'Linear Midnight';
+      case 'light_mood':       return 'LIGHT MOOD';
+      case 'indigo_pro':       return 'Indigo Professional';
+      case 'slate_modern':     return 'Slate Modern';
+      case 'emerald_finance':  return 'Emerald Finance';
+      case 'rose_luxury':      return 'Rose Luxury';
+      case 'dark_mode':        return 'Dark Mode';
+      case 'new_theme_linked': return 'New Theme (Linked)';
+      case 'linear_midnight':  return 'Linear Midnight';
+      case 'arctic_neon':      return 'Arctic Neon';
+      case 'ocean_glow':       return 'Ocean Glow';
+      case 'slate_pro':        return 'Slate Pro';
+      default:                 return id;
     }
   }
 
   Future<void> applyPalettePreset(String id) {
     final next = switch (id) {
+      // Light Mood — screenshot-matched light table, blue header/sidebar, colored pill actions
+      'light_mood' => _config.copyWith(
+        seedColor: _config.invoicePrimaryColor,
+        tableHeaderColor: _config.invoicePrimaryColor,
+        tableAreaColor: _config.invoiceSecondaryColor,
+        transactionCardColor: const Color(0xFFFFFFFF),
+        sidebarColor: shiftColor(_config.invoiceAccentColor, -0.08),
+        buttonBgColor: _config.invoicePrimaryColor,
+        buttonTextColor: const Color(0xFFFFFFFF),
+        buttonBorderColor: _config.invoiceAccentColor.withOpacity(0.55),
+        actionAddButtonColor: const Color(0xFF2FB36E),
+        actionEditButtonColor: const Color(0xFF3A7BD5),
+        actionDeleteButtonColor: const Color(0xFFD95C5C),
+        actionStatusButtonColor: const Color(0xFFF5A623),
+        customerCardBgColor: const Color(0xFFFFFFFF),
+        customerCardTextColor: _config.invoiceTextColor,
+        customerCardBorderColor: _config.invoicePrimaryColor.withOpacity(0.2),
+        transactionRowHeight: 46,
+        rowVerticalPadding: 8,
+        cardSpacing: 8,
+        cardBorderWidth: 1.0,
+        attachmentIconSize: 11,
+        baseFontSize: 14,
+        uiBrightnessShift: 0,
+        buttonPresetStyle: 1,
+        buttonShapeStyle: 1,
+        buttonBorderWidth: 1,
+        buttonRadius: 999,
+        buttonShadowBlur: 10,
+        buttonShadowOpacity: 0.14,
+        buttonShine: 0.16,
+        borderRadiusLevel: 1,
+        densityLevel: 1,
+        surfaceToneLevel: 1,
+        useDistinctActionButtonColors: true,
+        fontFamilyName: 'Cairo',
+        fontWeightLevel: 500,
+      ),
+      // ── 5 New Professional Presets ────────────────────────────────────────────
+      // Stripe-like Indigo — precise, professional, high contrast
+      'indigo_pro' => _config.copyWith(
+        seedColor: const Color(0xFF6366F1),
+        tableHeaderColor: const Color(0xFF1E1B4B),
+        tableAreaColor: const Color(0xFF0F0E2A),
+        transactionCardColor: const Color(0xFF1E1B4B),
+        sidebarColor: const Color(0xFF0C0A1F),
+        buttonBgColor: const Color(0xFF6366F1),
+        buttonTextColor: const Color(0xFFFFFFFF),
+        buttonBorderColor: const Color(0x886366F1),
+        actionAddButtonColor: const Color(0xFF22C55E),
+        actionEditButtonColor: const Color(0xFF818CF8),
+        actionDeleteButtonColor: const Color(0xFFF43F5E),
+        actionStatusButtonColor: const Color(0xFFFBBF24),
+        customerCardBgColor: const Color(0xFF1E1B4B),
+        customerCardTextColor: const Color(0xFFE0E7FF),
+        customerCardBorderColor: const Color(0x556366F1),
+        buttonPresetStyle: 4, buttonShapeStyle: 1,
+        buttonRadius: 8, buttonShadowBlur: 12, buttonShadowOpacity: 0.25,
+        buttonShine: 0.15, buttonBorderWidth: 1.2,
+        borderRadiusLevel: 1, densityLevel: 1,
+        surfaceToneLevel: 2, useTabularFigures: true,
+        fontFamilyName: 'Inter', fontWeightLevel: 500,
+        useDistinctActionButtonColors: true,
+      ),
+      // Linear-like Slate — clean, minimal, modern
+      'slate_modern' => _config.copyWith(
+        seedColor: const Color(0xFF64748B),
+        tableHeaderColor: const Color(0xFF1E293B),
+        tableAreaColor: const Color(0xFF0F172A),
+        transactionCardColor: const Color(0xFF1E293B),
+        sidebarColor: const Color(0xFF0F172A),
+        buttonBgColor: const Color(0xFF64748B),
+        buttonTextColor: const Color(0xFFFFFFFF),
+        buttonBorderColor: const Color(0x5594A3B8),
+        actionAddButtonColor: const Color(0xFF10B981),
+        actionEditButtonColor: const Color(0xFF38BDF8),
+        actionDeleteButtonColor: const Color(0xFFF43F5E),
+        actionStatusButtonColor: const Color(0xFFF59E0B),
+        customerCardBgColor: const Color(0xFF1E293B),
+        customerCardTextColor: const Color(0xFFCBD5E1),
+        customerCardBorderColor: const Color(0x3394A3B8),
+        buttonPresetStyle: 0, buttonShapeStyle: 0,
+        buttonRadius: 6, buttonShadowBlur: 8, buttonShadowOpacity: 0.15,
+        buttonShine: 0.08, buttonBorderWidth: 1.0,
+        borderRadiusLevel: 1, densityLevel: 0,
+        surfaceToneLevel: 1, useTabularFigures: true,
+        fontFamilyName: 'Inter', fontWeightLevel: 500,
+        useDistinctActionButtonColors: false,
+      ),
+      // Finance-grade Emerald — trust, clarity, WCAG AA+
+      'emerald_finance' => _config.copyWith(
+        seedColor: const Color(0xFF059669),
+        tableHeaderColor: const Color(0xFF064E3B),
+        tableAreaColor: const Color(0xFF022C22),
+        transactionCardColor: const Color(0xFF064E3B),
+        sidebarColor: const Color(0xFF011A15),
+        buttonBgColor: const Color(0xFF059669),
+        buttonTextColor: const Color(0xFFFFFFFF),
+        buttonBorderColor: const Color(0x7710B981),
+        actionAddButtonColor: const Color(0xFF34D399),
+        actionEditButtonColor: const Color(0xFF22D3EE),
+        actionDeleteButtonColor: const Color(0xFFFB7185),
+        actionStatusButtonColor: const Color(0xFFFBBF24),
+        customerCardBgColor: const Color(0xFF065F46),
+        customerCardTextColor: const Color(0xFFD1FAE5),
+        customerCardBorderColor: const Color(0x5534D399),
+        buttonPresetStyle: 3, buttonShapeStyle: 0,
+        buttonRadius: 8, buttonShadowBlur: 14, buttonShadowOpacity: 0.22,
+        buttonShine: 0.20, buttonBorderWidth: 1.1,
+        borderRadiusLevel: 1, densityLevel: 0,
+        surfaceToneLevel: 2, useTabularFigures: true,
+        fontFamilyName: 'Cairo', fontWeightLevel: 600,
+        useDistinctActionButtonColors: true,
+      ),
+      // Rose Luxury — premium, refined, editorial
+      'rose_luxury' => _config.copyWith(
+        seedColor: const Color(0xFFBE123C),
+        tableHeaderColor: const Color(0xFF3B0A1E),
+        tableAreaColor: const Color(0xFF200410),
+        transactionCardColor: const Color(0xFF3B0A1E),
+        sidebarColor: const Color(0xFF180209),
+        buttonBgColor: const Color(0xFFBE123C),
+        buttonTextColor: const Color(0xFFFFFFFF),
+        buttonBorderColor: const Color(0x77E11D48),
+        actionAddButtonColor: const Color(0xFFFB7185),
+        actionEditButtonColor: const Color(0xFFF9A8D4),
+        actionDeleteButtonColor: const Color(0xFFFF2D55),
+        actionStatusButtonColor: const Color(0xFFFBBF24),
+        customerCardBgColor: const Color(0xFF4C0519),
+        customerCardTextColor: const Color(0xFFFFE4E6),
+        customerCardBorderColor: const Color(0x55BE123C),
+        buttonPresetStyle: 2, buttonShapeStyle: 1,
+        buttonRadius: 12, buttonShadowBlur: 18, buttonShadowOpacity: 0.30,
+        buttonShine: 0.35, buttonBorderWidth: 1.0,
+        borderRadiusLevel: 2, densityLevel: 2,
+        surfaceToneLevel: 2, useTabularFigures: false,
+        fontFamilyName: 'Poppins', fontWeightLevel: 500,
+        useDistinctActionButtonColors: true,
+      ),
+      // Pure Dark Mode — OLED-ready, zero saturation background
+      'dark_mode' => _config.copyWith(
+        seedColor: const Color(0xFF22D3EE),
+        tableHeaderColor: const Color(0xFF1A1A1A),
+        tableAreaColor: const Color(0xFF0A0A0A),
+        transactionCardColor: const Color(0xFF1A1A1A),
+        sidebarColor: const Color(0xFF050505),
+        buttonBgColor: const Color(0xFF22D3EE),
+        buttonTextColor: const Color(0xFF030712),
+        buttonBorderColor: const Color(0x5522D3EE),
+        actionAddButtonColor: const Color(0xFF4ADE80),
+        actionEditButtonColor: const Color(0xFF38BDF8),
+        actionDeleteButtonColor: const Color(0xFFFB7185),
+        actionStatusButtonColor: const Color(0xFFFBBF24),
+        customerCardBgColor: const Color(0xFF111111),
+        customerCardTextColor: const Color(0xFFE5E5E5),
+        customerCardBorderColor: const Color(0x2AFFFFFF),
+        buttonPresetStyle: 2, buttonShapeStyle: 0,
+        buttonRadius: 10, buttonShadowBlur: 20, buttonShadowOpacity: 0.25,
+        buttonShine: 0.28, buttonBorderWidth: 1.0,
+        borderRadiusLevel: 1, densityLevel: 1,
+        surfaceToneLevel: 0, useTabularFigures: true,
+        enableGlassmorphism: false, glassBlurStrength: 0,
+        fontFamilyName: 'Inter', fontWeightLevel: 500,
+        useDistinctActionButtonColors: true,
+      ),
+      // ── Existing palettes ───────────────────────────────────────────────────────────
       'new_theme_linked' => _config.copyWith(
           tableHeaderColor: const Color(0xFF22345F),
           tableAreaColor: const Color(0xFF21335E),

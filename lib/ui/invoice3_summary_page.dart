@@ -1,13 +1,40 @@
-import 'dart:math' as math;
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 import '../logic/customer_transactions_logic.dart';
 import '../logic/design_controller.dart';
+import '../logic/saved_invoices_store.dart';
 
 // ─── Derived soft text = text color at 60% opacity ────────────────────────
 Color _soft(Color base) => base.withOpacity(0.60);
 Color _brd(Color accent) => accent.withOpacity(0.35);
+const List<String> _invoiceFontOptions = <String>[
+  'Cairo',
+  'Tajawal',
+  'Almarai',
+  'Changa',
+  'ElMessiri',
+  'NotoNaskhArabic',
+  'NotoKufiArabic',
+  'Amiri',
+  'ReemKufi',
+  'ArefRuqaa',
+  'Inter',
+  'Poppins',
+  'Arial',
+  'Tahoma',
+  'Calibri',
+  'Courier New',
+];
 
 class Invoice3SummaryPage extends StatefulWidget {
   const Invoice3SummaryPage({
@@ -16,12 +43,16 @@ class Invoice3SummaryPage extends StatefulWidget {
     required this.customerNameAr,
     required this.customerNameEn,
     required this.transactions,
+    this.customerId = 0,
+    this.isPrintPreview = false,
   });
 
   final bool isArabic;
   final String customerNameAr;
   final String customerNameEn;
   final List<CustomerTransaction> transactions;
+  final int customerId;
+  final bool isPrintPreview;
 
   @override
   State<Invoice3SummaryPage> createState() => _Invoice3SummaryPageState();
@@ -29,6 +60,7 @@ class Invoice3SummaryPage extends StatefulWidget {
 
 class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
   final _ctrl = DesignController.instance;
+  final GlobalKey _invoiceCaptureKey = GlobalKey();
   bool _panelOpen = false;
 
   @override
@@ -47,6 +79,198 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
 
   String _t(String ar, String en) => widget.isArabic ? ar : en;
 
+  TextTheme _resolveInvoiceTextTheme(TextTheme base, String family) {
+    switch (family) {
+      case 'Cairo':
+        return GoogleFonts.cairoTextTheme(base);
+      case 'Tajawal':
+        return GoogleFonts.tajawalTextTheme(base);
+      case 'Almarai':
+        return GoogleFonts.almaraiTextTheme(base);
+      case 'Changa':
+        return GoogleFonts.changaTextTheme(base);
+      case 'ElMessiri':
+        return GoogleFonts.elMessiriTextTheme(base);
+      case 'NotoNaskhArabic':
+        return GoogleFonts.notoNaskhArabicTextTheme(base);
+      case 'NotoKufiArabic':
+        return GoogleFonts.notoKufiArabicTextTheme(base);
+      case 'Amiri':
+        return GoogleFonts.amiriTextTheme(base);
+      case 'ReemKufi':
+        return GoogleFonts.reemKufiTextTheme(base);
+      case 'ArefRuqaa':
+        return GoogleFonts.arefRuqaaTextTheme(base);
+      case 'Inter':
+        return GoogleFonts.interTextTheme(base);
+      case 'Poppins':
+        return GoogleFonts.poppinsTextTheme(base);
+      default:
+        return base.apply(fontFamily: family);
+    }
+  }
+
+  TextStyle _resolveInvoiceBaseTextStyle(String family) {
+    switch (family) {
+      case 'Cairo':
+        return GoogleFonts.cairo();
+      case 'Tajawal':
+        return GoogleFonts.tajawal();
+      case 'Almarai':
+        return GoogleFonts.almarai();
+      case 'Changa':
+        return GoogleFonts.changa();
+      case 'ElMessiri':
+        return GoogleFonts.elMessiri();
+      case 'NotoNaskhArabic':
+        return GoogleFonts.notoNaskhArabic();
+      case 'NotoKufiArabic':
+        return GoogleFonts.notoKufiArabic();
+      case 'Amiri':
+        return GoogleFonts.amiri();
+      case 'ReemKufi':
+        return GoogleFonts.reemKufi();
+      case 'ArefRuqaa':
+        return GoogleFonts.arefRuqaa();
+      case 'Inter':
+        return GoogleFonts.inter();
+      case 'Poppins':
+        return GoogleFonts.poppins();
+      default:
+        return TextStyle(fontFamily: family);
+    }
+  }
+
+  Future<Uint8List> _captureInvoicePng() async {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final deviceRatio = mediaQuery?.devicePixelRatio ?? View.of(context).devicePixelRatio;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) {
+      throw StateError('Widget is no longer mounted');
+    }
+    final boundary = _invoiceCaptureKey.currentContext?.findRenderObject()
+        as RenderRepaintBoundary?;
+    if (boundary == null) {
+      throw StateError('Invoice boundary is not ready');
+    }
+
+    final pixelRatio = (deviceRatio * 2).clamp(2.5, 5.0);
+    final image = await boundary.toImage(pixelRatio: pixelRatio);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (bytes == null) {
+      throw StateError('Failed to capture invoice image');
+    }
+    return bytes.buffer.asUint8List();
+  }
+
+  void _saveCurrentInvoice() {
+    if (widget.transactions.isEmpty) return;
+    final txs = widget.transactions;
+    final grandTotal = txs.fold<double>(0, (sum, tx) => sum + tx.grandTotal);
+    final first = txs.first;
+    SavedInvoicesStore.instance.add(
+      SavedInvoiceEntry(
+        customerNameAr: widget.customerNameAr,
+        customerNameEn: widget.customerNameEn,
+        customerId: widget.customerId,
+        invoiceNumber: first.invoiceNumber,
+        invoiceDate: first.date,
+        grandTotal: grandTotal,
+        transactions: List<CustomerTransaction>.from(txs),
+        savedAt: DateTime.now(),
+      ),
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_t('تم حفظ الفاتورة', 'Invoice saved'))),
+    );
+  }
+
+  Widget _headerContactLine(IconData icon, String text, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 10, color: color),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            color: color,
+            fontSize: 8.9,
+            fontWeight: FontWeight.w600,
+            height: 1.0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<Uint8List> _buildInvoicePdf(PdfPageFormat format) async {
+    final doc = pw.Document();
+    final imageBytes = await _captureInvoicePng();
+    final invoiceImage = pw.MemoryImage(imageBytes);
+
+    doc.addPage(
+      pw.Page(
+        pageFormat: format,
+        margin: pw.EdgeInsets.zero,
+        build: (context) => pw.FullPage(
+          ignoreMargins: true,
+          child: pw.Container(
+            color: PdfColors.white,
+            child: pw.FittedBox(
+              fit: pw.BoxFit.contain,
+              child: pw.Image(invoiceImage),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return doc.save();
+  }
+
+  Future<void> _printCurrentInvoice() async {
+    if (widget.transactions.isEmpty) return;
+    try {
+      await Printing.layoutPdf(
+        name: 'invoice3_${widget.transactions.first.invoiceNumber}',
+        onLayout: _buildInvoicePdf,
+        usePrinterSettings: true,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('تعذر فتح نافذة الطباعة', 'Unable to open print dialog'))),
+      );
+    }
+  }
+
+  Future<void> _savePdfFile() async {
+    if (widget.transactions.isEmpty) return;
+    final suggestedName = 'invoice3_${widget.transactions.first.invoiceNumber}.pdf';
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: _t('حفظ الفاتورة PDF', 'Save Invoice PDF'),
+      fileName: suggestedName,
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+    );
+    if (path == null || path.isEmpty) return;
+
+    try {
+      final bytes = await _buildInvoicePdf(PdfPageFormat.a4);
+      await File(path).writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('تم حفظ ملف PDF', 'PDF file saved'))),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_t('فشل حفظ ملف PDF', 'Failed to save PDF file'))),
+      );
+    }
+  }
+
   String _fmt(double v) {
     final parts = v.toStringAsFixed(2).split('.');
     final sb = StringBuffer();
@@ -64,6 +288,8 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
     final accent      = cfg.invoiceAccentColor;
     final secondary   = cfg.invoiceSecondaryColor;
     final textColor   = cfg.invoiceTextColor;
+    final invoiceFont = cfg.invoiceFontFamily;
+    final invoiceBaseTextStyle = _resolveInvoiceBaseTextStyle(invoiceFont);
     final softColor   = _soft(textColor);
     final borderColor = _brd(accent);
 
@@ -85,11 +311,8 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
     }
 
     final grandTotal = txs.fold<double>(0, (s, tx) => s + tx.grandTotal);
-    final tax        = grandTotal * 0.05;
-    final beforeTax  = grandTotal - tax;
     final invNo      = txs.isNotEmpty ? txs.first.invoiceNumber : '---';
     final invDate    = txs.isNotEmpty ? txs.first.date : '---';
-    const phone      = '+971 556 428 050';
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -102,13 +325,43 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: Text(_t('فاتورة 3', 'Invoice 3')),
+          title: Text(
+            widget.isPrintPreview
+                ? _t('معاينة طباعة فاتورة 3', 'Invoice 3 Print Preview')
+                : _t('فاتورة 3', 'Invoice 3'),
+          ),
           actions: [
-            IconButton(
-              tooltip: _t('تعديل التصميم', 'Design Panel'),
-              icon: Icon(_panelOpen ? Icons.tune : Icons.tune_outlined),
-              onPressed: () => setState(() => _panelOpen = !_panelOpen),
-            ),
+            if (!widget.isPrintPreview) ...[
+              TextButton.icon(
+                onPressed: _printCurrentInvoice,
+                icon: const Icon(Icons.print_rounded, color: Colors.white, size: 18),
+                label: Text(
+                  _t('طباعة', 'Print'),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _saveCurrentInvoice,
+                icon: const Icon(Icons.save_rounded, color: Colors.white, size: 18),
+                label: Text(
+                  _t('حفظ', 'Save'),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _savePdfFile,
+                icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 18),
+                label: Text(
+                  _t('حفظ PDF', 'Save PDF'),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                tooltip: _t('تعديل التصميم', 'Design Panel'),
+                icon: Icon(_panelOpen ? Icons.tune : Icons.tune_outlined),
+                onPressed: () => setState(() => _panelOpen = !_panelOpen),
+              ),
+            ],
             IconButton(
               icon: const Icon(Icons.close),
               onPressed: () => Navigator.of(context).pop(),
@@ -126,51 +379,76 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 794),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: borderColor),
-                          borderRadius: BorderRadius.circular(4),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x1A000000),
-                              blurRadius: 18,
-                              offset: Offset(0, 6),
+                      child: RepaintBoundary(
+                        key: _invoiceCaptureKey,
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            textTheme: _resolveInvoiceTextTheme(
+                              Theme.of(context).textTheme,
+                              invoiceFont,
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: CustomPaint(
-                            painter: _CornersPainter(accent: accent, secondary: secondary),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(40, 32, 40, 36),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _buildHeader(invDate, invNo, accent, textColor, softColor),
-                                  const SizedBox(height: 10),
-                                  Divider(color: borderColor, thickness: 1.2),
-                                  const SizedBox(height: 10),
-                                  _buildCustomerBlock(
-                                    widget.customerNameAr, widget.customerNameEn,
-                                    phone, textColor, softColor, accent, borderColor,
+                          ),
+                          child: DefaultTextStyle.merge(
+                            style: invoiceBaseTextStyle,
+                            child: Container(
+                              height: 1123,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: borderColor),
+                                borderRadius: BorderRadius.circular(4),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x22000000),
+                                    blurRadius: 14,
+                                    offset: Offset(0, 8),
                                   ),
-                                  const SizedBox(height: 16),
-                                  _buildItemsTable(items, primary, secondary, borderColor, textColor, softColor),
-                                  const SizedBox(height: 20),
-                                  _buildTotals(beforeTax, tax, grandTotal, accent, textColor, softColor, borderColor),
-                                  const SizedBox(height: 28),
-                                  _buildStampAndLogo(accent, softColor),
-                                  const SizedBox(height: 20),
-                                  Text(
-                                    'الاستبدال والاسترجاع خلال 14 يومًا من تاريخ تسليم السلعة / Returns & exchanges within 14 days of delivery.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: softColor, fontSize: 9.5, fontWeight: FontWeight.w500),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildFooter(softColor, accent),
                                 ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: CustomPaint(
+                                  painter: _CornersPainter(accent: accent, secondary: secondary),
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(40, 32, 40, 36),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        _buildHeader(accent, textColor, softColor),
+                                        const SizedBox(height: 10),
+                                        Divider(color: borderColor, thickness: 1.2),
+                                        const SizedBox(height: 10),
+                                        _buildCustomerBlock(
+                                          widget.customerNameAr,
+                                          widget.customerNameEn,
+                                          invDate,
+                                          invNo,
+                                          textColor,
+                                          softColor,
+                                          accent,
+                                          borderColor,
+                                        ),
+                                        const SizedBox(height: 16),
+                                        _buildItemsTable(items, primary, secondary, borderColor, textColor, softColor),
+                                        const SizedBox(height: 20),
+                                        _buildTotals(grandTotal, accent, borderColor),
+                                        const Spacer(),
+                                        Center(
+                                          child: Image.asset(
+                                            'assets/images/stamp.png',
+                                            width: 96,
+                                            height: 96,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        _buildSignaturesAndStamp(primary, textColor),
+                                        const SizedBox(height: 8),
+                                        _buildFooter(primary),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -190,55 +468,107 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
     );
   }
 
-  // ── Header: logo + company info on start, big title on end ───────────────
-  Widget _buildHeader(String invDate, String invNo, Color accent, Color textColor, Color softColor) {
+  // ── Header: office name + meta on start | INVOICE centered ───────────────
+  Widget _buildHeader(Color accent, Color textColor, Color softColor) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Company identity block
+        // Start side: office name + meta (no logo area)
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.business_rounded, color: Colors.white, size: 32),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('شركة الإعلام',
-                        style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w900)),
-                    Text('Inform Company',
-                        style: TextStyle(color: softColor, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ],
+            Text(
+              'انفورم للطباعة والتصوير',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                height: 1.05,
+              ),
             ),
-            const SizedBox(height: 14),
-            _metaLine('التاريخ / Date', invDate, textColor, softColor),
-            const SizedBox(height: 5),
-            _metaLine('رقم الفاتورة / Invoice No.', invNo, textColor, softColor),
+            const SizedBox(height: 2),
+            Text(
+              'Inform Typing Photocopy',
+              style: TextStyle(
+                color: accent,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
+                height: 1.1,
+              ),
+            ),
+            const SizedBox(height: 7),
+            SizedBox(
+              width: 210,
+              child: Column(
+                children: [
+                  Container(height: 1.4, color: accent),
+                  const SizedBox(height: 3),
+                  Container(height: 1.0, color: accent.withOpacity(0.65)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            _headerContactLine(
+              Icons.phone_rounded,
+              '971528047909 / 971556428050',
+              softColor,
+            ),
+            const SizedBox(height: 3),
+            _headerContactLine(
+              Icons.location_on_outlined,
+              'مصفح الصناعية م7 - أبوظبي',
+              softColor,
+            ),
+            const SizedBox(height: 3),
+            _headerContactLine(
+              Icons.email_outlined,
+              'alzaeemtyping@hotmail.com',
+              softColor,
+            ),
           ],
         ),
-        const Spacer(),
-        // Invoice title
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text('فـاتـورة',
-                style: TextStyle(color: accent, fontSize: 46, fontWeight: FontWeight.w900, height: 0.95)),
-            Text('INVOICE',
-                style: TextStyle(color: accent, fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: 5)),
-          ],
+        // Centre: INVOICE big + فاتورة small + decorative line
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                'INVOICE',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 48,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 7,
+                  height: 1.0,
+                ),
+              ),
+              Text(
+                'فاتورة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: 90,
+                height: 2.5,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(width: 210),
       ],
     );
   }
@@ -254,8 +584,16 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
   }
 
   // ── Customer block ────────────────────────────────────────────────────────
-  Widget _buildCustomerBlock(String customerAr, String customerEn, String phone,
-      Color textColor, Color softColor, Color accent, Color borderColor) {
+  Widget _buildCustomerBlock(
+    String customerAr,
+    String customerEn,
+    String invDate,
+    String invNo,
+    Color textColor,
+    Color softColor,
+    Color accent,
+    Color borderColor,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -283,13 +621,9 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Row(
-                children: [
-                  Icon(Icons.phone_outlined, size: 12, color: softColor),
-                  const SizedBox(width: 4),
-                  Text(phone, style: TextStyle(color: softColor, fontSize: 11)),
-                ],
-              ),
+              _metaLine('التاريخ / Date', invDate, textColor, softColor),
+              const SizedBox(height: 5),
+              _metaLine('رقم الفاتورة', invNo, textColor, softColor),
             ],
           ),
         ],
@@ -317,17 +651,17 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
             child: Row(
               children: [
                 _hCell('#', 1),
-                _hCell('الوصف / Description', 5),
-                _hCell('الكمية / Qty', 2),
-                _hCell('سعر الوحدة / Unit Price', 3),
-                _hCell('الإجمالي / Total', 2),
+                _hCell(widget.isArabic ? 'الوصف' : 'Description', 5),
+                _hCell(widget.isArabic ? 'الكمية' : 'Qty', 2),
+                _hCell(widget.isArabic ? 'سعر الوحدة' : 'Unit Price', 3),
+                _hCell(widget.isArabic ? 'الإجمالي' : 'Total', 2),
               ],
             ),
           ),
           // Data rows
           for (int i = 0; i < rows.length; i++)
             Container(
-              color: i.isOdd ? secondary.withOpacity(0.3) : const Color(0xFFFBFCFD),
+              color: i.isOdd ? const Color(0xFFF3F4F6) : Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -335,14 +669,13 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
                   _dCell('${i + 1}', 1, TextAlign.center, textColor),
                   Expanded(
                     flex: 5,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(rows[i].nameAr,
-                            style: TextStyle(color: textColor, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                        Text(rows[i].nameEn,
-                            style: TextStyle(color: softColor, fontSize: 10, fontWeight: FontWeight.w500)),
-                      ],
+                    child: Text(
+                      widget.isArabic ? rows[i].nameAr : rows[i].nameEn,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   _dCell('${rows[i].qty}', 2, TextAlign.center, textColor),
@@ -378,8 +711,7 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
       );
 
   // ── Totals ────────────────────────────────────────────────────────────────
-  Widget _buildTotals(double beforeTax, double tax, double grandTotal,
-      Color accent, Color textColor, Color softColor, Color borderColor) {
+  Widget _buildTotals(double grandTotal, Color accent, Color borderColor) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -392,10 +724,6 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
         ),
         child: Column(
           children: [
-            _totalRow('قبل الضريبة / Before Tax', _fmt(beforeTax), textColor, softColor),
-            const SizedBox(height: 5),
-            _totalRow('ضريبة القيمة المضافة / VAT (5%)', _fmt(tax), textColor, softColor),
-            Divider(color: accent, height: 18, thickness: 1.5),
             _totalRow('الإجمالي / Grand Total', _fmt(grandTotal), accent, accent, bold: true),
           ],
         ),
@@ -423,85 +751,75 @@ class _Invoice3SummaryPageState extends State<Invoice3SummaryPage> {
     );
   }
 
-  // ── Stamp + Logo (always after last item) ─────────────────────────────────
-  Widget _buildStampAndLogo(Color accent, Color softColor) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
-      children: [
-        // Official stamp
-        SizedBox(
-          width: 110,
-          height: 110,
-          child: CustomPaint(
-            painter: _StampPainter(accent),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('مدفوع',
-                      style: TextStyle(
-                          color: accent,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 17,
-                          letterSpacing: 1)),
-                  Text('PAID',
-                      style: TextStyle(
-                          color: accent,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11,
-                          letterSpacing: 4)),
-                ],
-              ),
+  Widget _buildSignaturesAndStamp(Color primary, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: _signatureBlock(
+              title: 'INFORM TYPING PHOTOCOPY',
+              textColor: textColor,
+              lineColor: primary,
+              align: CrossAxisAlignment.end,
             ),
           ),
-        ),
-        // Logo
-        Column(
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
-              child: const Icon(Icons.business_rounded, color: Colors.white, size: 36),
+          const SizedBox(width: 150),
+          Expanded(
+            child: _signatureBlock(
+              title: 'توقيع المستلم / Recipient Signature',
+              textColor: textColor,
+              lineColor: primary,
+              align: CrossAxisAlignment.start,
             ),
-            const SizedBox(height: 6),
-            Text('شركة الإعلام',
-                style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 13)),
-            Text('Inform Company',
-                style: TextStyle(color: softColor, fontWeight: FontWeight.w600, fontSize: 11)),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _signatureBlock({
+    required String title,
+    required Color textColor,
+    required Color lineColor,
+    required CrossAxisAlignment align,
+  }) {
+    return Column(
+      crossAxisAlignment: align,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '······························',
+          style: TextStyle(
+            color: lineColor,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          title,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 10.2,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ],
     );
   }
 
   // ── Footer ────────────────────────────────────────────────────────────────
-  Widget _buildFooter(Color softColor, Color accent) {
+  Widget _buildFooter(Color primary) {
     return Container(
-      padding: const EdgeInsets.only(top: 12),
+      width: double.infinity,
+      height: 16,
       decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: _brd(accent), width: 1.2))),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _footerItem(Icons.location_on_outlined,
-              'العنوان: شارع الاتحاد، أبوظبي / Union St., Abu Dhabi', softColor),
-          _footerItem(Icons.phone_outlined, '+971 556 428 050', softColor),
-          _footerItem(Icons.email_outlined, 'info@inform.ae', softColor),
-        ],
+        color: primary,
+        borderRadius: BorderRadius.circular(3),
       ),
-    );
-  }
-
-  Widget _footerItem(IconData icon, String text, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 11, color: color),
-        const SizedBox(width: 4),
-        Text(text,
-            style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.w500)),
-      ],
     );
   }
 }
@@ -587,6 +905,40 @@ class _InvoiceDesignPanelState extends State<_InvoiceDesignPanel> {
                     label: _t('النص الرئيسي', 'Main Text'),
                     color: cfg.invoiceTextColor,
                     onPicked: (c) => widget.ctrl.setInvoiceTextColor(c),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFD5DDE7)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _t('خط الفاتورة', 'Invoice Font'),
+                            style: const TextStyle(
+                              color: Color(0xFF243241),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        DropdownButton<String>(
+                          value: _invoiceFontOptions.contains(cfg.invoiceFontFamily)
+                              ? cfg.invoiceFontFamily
+                              : 'Cairo',
+                          items: _invoiceFontOptions
+                              .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) widget.ctrl.setInvoiceFontFamily(v);
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 18),
                   ElevatedButton.icon(
@@ -776,47 +1128,6 @@ class _InvoiceColorRowState extends State<_InvoiceColorRow> {
       ],
     );
   }
-}
-
-// ─── Stamp painter: circular seal with tick marks ─────────────────────────
-class _StampPainter extends CustomPainter {
-  const _StampPainter(this.color);
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center  = Offset(size.width / 2, size.height / 2);
-    final outerR  = size.width / 2 - 3;
-    final innerR  = outerR - 11;
-    final paint   = Paint()..style = PaintingStyle.stroke;
-
-    paint
-      ..color = color.withOpacity(0.55)
-      ..strokeWidth = 2.4;
-    canvas.drawCircle(center, outerR, paint);
-
-    paint
-      ..color = color.withOpacity(0.35)
-      ..strokeWidth = 1.4;
-    canvas.drawCircle(center, innerR, paint);
-
-    paint
-      ..color = color.withOpacity(0.28)
-      ..strokeWidth = 1.1;
-    const tickCount = 36;
-    for (int i = 0; i < tickCount; i++) {
-      if (i % 3 == 0) continue;
-      final angle = (i * 2 * math.pi) / tickCount;
-      final x1 = center.dx + (innerR + 2)  * math.cos(angle);
-      final y1 = center.dy + (innerR + 2)  * math.sin(angle);
-      final x2 = center.dx + (outerR - 2)  * math.cos(angle);
-      final y2 = center.dy + (outerR - 2)  * math.sin(angle);
-      canvas.drawLine(Offset(x1, y1), Offset(x2, y2), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_StampPainter old) => old.color != color;
 }
 
 // ─── Corner painter: sizes itself to child → no zero-size issue ────────────

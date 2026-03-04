@@ -27,7 +27,22 @@ class DesignSettingsPage extends StatelessWidget {
         const neonAccent = Color(0xFF0EA5E9);
         const neonAccentSoft = Color(0x330EA5E9);
         const fontOptions = <String>[
-          'Cairo', 'Inter', 'Poppins', 'Arial', 'Tahoma', 'Calibri', 'Courier New',
+          'Cairo',
+          'Tajawal',
+          'Almarai',
+          'Changa',
+          'ElMessiri',
+          'NotoNaskhArabic',
+          'NotoKufiArabic',
+          'Amiri',
+          'ReemKufi',
+          'ArefRuqaa',
+          'Inter',
+          'Poppins',
+          'Arial',
+          'Tahoma',
+          'Calibri',
+          'Courier New',
         ];
         final modernTheme = Theme.of(context).copyWith(
           scaffoldBackgroundColor: panelBg,
@@ -163,6 +178,292 @@ class DesignSettingsPage extends StatelessWidget {
             ),
             const SizedBox(height: 14),
 
+            // ── Section 0: Appearance System ───────────────────────────────
+            _CollapsibleSection(
+              title: _t('نظام المظهر', 'Appearance System'),
+              icon: Icons.auto_awesome_rounded,
+              accentColor: const Color(0xFF6366F1),
+              initiallyOpen: true,
+              children: [
+                // Seed Color + Generate
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _t('اللون الجذر (Seed Color)', 'Seed Color'),
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textBlack),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _t('اختر لون أساسي ويتولى البرنامج توليد كامل لوحة الألوان تلقائياً.',
+                             'Pick a base color and the app derives the full palette automatically.'),
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () async {
+                                await showDialog<void>(
+                                  context: context,
+                                  builder: (_) => _RgbColorPickerDialog(
+                                    initial: cfg.seedColor,
+                                    onChanged: (c) => controller.setSeedColor(c),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: cfg.seedColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: cfg.seedColor.withOpacity(0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(Icons.colorize, color: Colors.white, size: 16),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: () => controller.generateFromSeed(cfg.seedColor),
+                                icon: const Icon(Icons.auto_fix_high, size: 16),
+                                label: Text(_t('توليد اللوحة', 'Generate Palette'),
+                                    style: const TextStyle(fontSize: 12)),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6366F1),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Border Radius Level
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_t('استدارة الحواف', 'Border Radius'),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textBlack)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            for (final entry in [
+                              (0, _t('بدون', 'None')),
+                              (1, _t('متوسط', 'Medium')),
+                              (2, _t('ناعم جداً', 'Extra Round')),
+                            ])
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    decoration: BoxDecoration(
+                                      color: cfg.borderRadiusLevel == entry.$1
+                                          ? const Color(0xFF6366F1)
+                                          : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: cfg.borderRadiusLevel == entry.$1
+                                            ? const Color(0xFF6366F1)
+                                            : const Color(0xFFCBD5E1),
+                                      ),
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () => controller.setBorderRadiusLevel(entry.$1),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Text(entry.$2,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: cfg.borderRadiusLevel == entry.$1
+                                                  ? Colors.white
+                                                  : const Color(0xFF475569),
+                                            )),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Density Level
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_t('كثافة البيانات', 'Data Density'),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textBlack)),
+                        const SizedBox(height: 4),
+                        Text(_t('Compact للمحاسبين، Spacious للمظهر العصري',
+                                'Compact for accountants, Spacious for modern look'),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            for (final entry in [
+                              (0, _t('مضغوط', 'Compact'), Icons.density_small),
+                              (1, _t('عادي', 'Normal'), Icons.density_medium),
+                              (2, _t('واسع', 'Spacious'), Icons.density_large),
+                            ])
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    decoration: BoxDecoration(
+                                      color: cfg.densityLevel == entry.$1
+                                          ? const Color(0xFF0EA5E9)
+                                          : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: cfg.densityLevel == entry.$1
+                                            ? const Color(0xFF0EA5E9)
+                                            : const Color(0xFFCBD5E1),
+                                      ),
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () => controller.setDensityLevel(entry.$1),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Column(
+                                          children: [
+                                            Icon(entry.$3,
+                                                size: 14,
+                                                color: cfg.densityLevel == entry.$1
+                                                    ? Colors.white
+                                                    : const Color(0xFF64748B)),
+                                            const SizedBox(height: 2),
+                                            Text(entry.$2,
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: cfg.densityLevel == entry.$1
+                                                      ? Colors.white
+                                                      : const Color(0xFF475569),
+                                                )),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+
+                // Surface Tone Level
+                _SliderTile(
+                  label: _t('عمق طبقات الخلفية (Surface Tones)', 'Surface Tone Depth'),
+                  value: cfg.surfaceToneLevel.toDouble(),
+                  min: 0, max: 3,
+                  onChanged: (v) => controller.setSurfaceToneLevel(v.round()),
+                ),
+
+                // Glassmorphism
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(_t('تأثير الزجاج (Glassmorphism)', 'Glassmorphism'),
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textBlack)),
+                          subtitle: Text(_t('خلفية شفافة مع ضبابية ناعمة',
+                                          'Frosted glass backgrounds'),
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                          value: cfg.enableGlassmorphism,
+                          onChanged: (v) => controller.setEnableGlassmorphism(v),
+                        ),
+                        if (cfg.enableGlassmorphism) ...[
+                          const SizedBox(height: 4),
+                          _SliderTile(
+                            label: _t('قوة الضبابية', 'Blur strength'),
+                            value: cfg.glassBlurStrength,
+                            min: 0, max: 40,
+                            onChanged: (v) => controller.setGlassBlurStrength(v),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // ── Section 0b: Table Spacing ───────────────────────────────────
+            _CollapsibleSection(
+              title: _t('مسافات الجدول', 'Table Spacing'),
+              icon: Icons.space_bar_rounded,
+              accentColor: const Color(0xFF0EA5E9),
+              children: [
+                _SliderTile(
+                  label: _t('المسافة الأفقية بين الأعمدة', 'Column spacing (horizontal)'),
+                  value: cfg.columnSpacingH, min: 0, max: 32,
+                  onChanged: (v) => controller.setColumnSpacingH(v),
+                ),
+                _SliderTile(
+                  label: _t('الحشوة الأفقية داخل الخلايا', 'Cell horizontal padding'),
+                  value: cfg.cellPaddingH, min: 4, max: 40,
+                  onChanged: (v) => controller.setCellPaddingH(v),
+                ),
+                Card(
+                  child: SwitchListTile(
+                    title: Text(_t('أرقام محاسبية (Tabular Figures)', 'Tabular Figures'),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: textBlack)),
+                    subtitle: Text(
+                      _t('تثبيت عرض الأرقام لاصطفاف محاسبي دقيق',
+                         'Fixed-width digits for precise accounting alignment'),
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                    value: cfg.useTabularFigures,
+                    onChanged: (v) => controller.setUseTabularFigures(v),
+                  ),
+                ),
+              ],
+            ),
+
             // ── Section 1: General ─────────────────────────────────────────
             _CollapsibleSection(
               title: _t('إعدادات عامة', 'General Settings'),
@@ -275,6 +576,22 @@ class DesignSettingsPage extends StatelessWidget {
                 _ColorTile(label: _t('لون الصفوف البديلة', 'Alt row color'), color: cfg.invoiceSecondaryColor, onPicked: (c) => controller.setInvoiceSecondaryColor(c)),
                 _ColorTile(label: _t('لون التمييز والعنوان', 'Accent / title color'), color: cfg.invoiceAccentColor, onPicked: (c) => controller.setInvoiceAccentColor(c)),
                 _ColorTile(label: _t('لون النص الرئيسي', 'Main text color'), color: cfg.invoiceTextColor, onPicked: (c) => controller.setInvoiceTextColor(c)),
+                Card(
+                  child: ListTile(
+                    title: Text(_t('خط الفاتورة', 'Invoice font')),
+                    trailing: DropdownButton<String>(
+                      value: fontOptions.contains(cfg.invoiceFontFamily)
+                          ? cfg.invoiceFontFamily
+                          : 'Cairo',
+                      items: fontOptions
+                          .map((f) => DropdownMenuItem(value: f, child: Text(f)))
+                          .toList(),
+                      onChanged: (v) {
+                        if (v != null) controller.setInvoiceFontFamily(v);
+                      },
+                    ),
+                  ),
+                ),
               ],
             ),
 
@@ -1096,6 +1413,44 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
   late double _g;
   late double _b;
 
+  // ── Tailwind / Radix-inspired palette ──────────────────────────────────────
+  // Each entry: (family label, [shade100..shade900])
+  static const _swatchGroups = <(String, List<Color>)>[
+    ('Slate', [
+      Color(0xFFF8FAFC), Color(0xFFE2E8F0), Color(0xFFCBD5E1),
+      Color(0xFF94A3B8), Color(0xFF64748B), Color(0xFF475569),
+      Color(0xFF334155), Color(0xFF1E293B), Color(0xFF0F172A),
+    ]),
+    ('Indigo', [
+      Color(0xFFEEF2FF), Color(0xFFC7D2FE), Color(0xFFA5B4FC),
+      Color(0xFF818CF8), Color(0xFF6366F1), Color(0xFF4F46E5),
+      Color(0xFF4338CA), Color(0xFF3730A3), Color(0xFF312E81),
+    ]),
+    ('Sky', [
+      Color(0xFFE0F2FE), Color(0xFFBAE6FD), Color(0xFF7DD3FC),
+      Color(0xFF38BDF8), Color(0xFF0EA5E9), Color(0xFF0284C7),
+      Color(0xFF0369A1), Color(0xFF075985), Color(0xFF0C4A6E),
+    ]),
+    ('Emerald', [
+      Color(0xFFECFDF5), Color(0xFFA7F3D0), Color(0xFF6EE7B7),
+      Color(0xFF34D399), Color(0xFF10B981), Color(0xFF059669),
+      Color(0xFF047857), Color(0xFF065F46), Color(0xFF064E3B),
+    ]),
+    ('Rose', [
+      Color(0xFFFFF1F2), Color(0xFFFECDD3), Color(0xFFFDA4AF),
+      Color(0xFFFB7185), Color(0xFFF43F5E), Color(0xFFE11D48),
+      Color(0xFFBE123C), Color(0xFF9F1239), Color(0xFF881337),
+    ]),
+    ('Amber', [
+      Color(0xFFFFFBEB), Color(0xFFFDE68A), Color(0xFFFCD34D),
+      Color(0xFFFBBF24), Color(0xFFF59E0B), Color(0xFFD97706),
+      Color(0xFFB45309), Color(0xFF92400E), Color(0xFF78350F),
+    ]),
+  ];
+
+  static const _slate900 = Color(0xFF0F172A);
+  static const _slate600 = Color(0xFF475569);
+
   @override
   void initState() {
     super.initState();
@@ -1104,108 +1459,189 @@ class _RgbColorPickerDialogState extends State<_RgbColorPickerDialog> {
     _b = widget.initial.blue.toDouble();
   }
 
+  void _pick(Color c) {
+    setState(() {
+      _r = c.red.toDouble();
+      _g = c.green.toDouble();
+      _b = c.blue.toDouble();
+    });
+    widget.onChanged(c);
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = Color.fromRGBO(_r.round(), _g.round(), _b.round(), 1);
-    const modernSwatches = <Color>[
-      Color(0xFF0B1220),
-      Color(0xFF111827),
-      Color(0xFF1E293B),
-      Color(0xFF334155),
-      Color(0xFF475569),
-      Color(0xFF64748B),
-      Color(0xFF94A3B8),
-      Color(0xFFCBD5E1),
-      Color(0xFFE2E8F0),
-      Color(0xFFF8FAFC),
-      Color(0xFF22D3EE),
-      Color(0xFF14F1D9),
-      Color(0xFF60A5FA),
-      Color(0xFF6366F1),
-      Color(0xFF34D399),
-      Color(0xFFF59E0B),
-      Color(0xFFFB7185),
-    ];
+    // hex string for display
+    final hex =
+        '#${current.red.toRadixString(16).padLeft(2, '0')}'
+        '${current.green.toRadixString(16).padLeft(2, '0')}'
+        '${current.blue.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
+
     return AlertDialog(
       backgroundColor: const Color(0xFFF8FAFC),
-      title: const Text('Pick color', style: TextStyle(color: Color(0xFF000000))),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
+      titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      title: Row(
         children: [
           Container(
-            width: double.infinity,
-            height: 44,
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: current,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
             ),
           ),
-          const SizedBox(height: 10),
-          _rgbSlider('R', _r, (v) => setState(() => _r = v)),
-          _rgbSlider('G', _g, (v) => setState(() => _g = v)),
-          _rgbSlider('B', _b, (v) => setState(() => _b = v)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final swatch in modernSwatches)
-                InkWell(
-                  onTap: () => setState(() {
-                    _r = swatch.red.toDouble();
-                    _g = swatch.green.toDouble();
-                    _b = swatch.blue.toDouble();
-                    widget.onChanged(
-                        Color.fromRGBO(_r.round(), _g.round(), _b.round(), 1));
-                  }),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      color: swatch,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: swatch == const Color(0xFFF8FAFC)
-                            ? const Color(0xAA334155)
-                            : Colors.transparent,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          const SizedBox(width: 10),
+          Text(
+            hex,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: _slate900,
+              letterSpacing: 1.2,
+            ),
           ),
         ],
+      ),
+      content: SizedBox(
+        width: 340,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Preview bar ────────────────────────────────────────────
+              Container(
+                width: double.infinity,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: current,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // ── RGB sliders ─────────────────────────────────────────────
+              _rgbSlider('R', _r, const Color(0xFFE11D48),
+                  (v) => setState(() => _r = v)),
+              _rgbSlider('G', _g, const Color(0xFF059669),
+                  (v) => setState(() => _g = v)),
+              _rgbSlider('B', _b, const Color(0xFF4F46E5),
+                  (v) => setState(() => _b = v)),
+              const SizedBox(height: 10),
+
+              // ── Tailwind swatches ───────────────────────────────────────
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 10),
+              for (final group in _swatchGroups) ...[
+                Text(
+                  group.$1,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _slate600,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    for (final swatch in group.$2)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _pick(swatch),
+                          child: Container(
+                            height: 26,
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            decoration: BoxDecoration(
+                              color: swatch,
+                              borderRadius: BorderRadius.circular(5),
+                              border: Border.all(
+                                color: const Color(0xFFCBD5E1),
+                                width: 0.6,
+                              ),
+                              boxShadow: swatch == current
+                                  ? [
+                                      BoxShadow(
+                                        color: swatch.withOpacity(0.5),
+                                        blurRadius: 5,
+                                        spreadRadius: 1,
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+              ],
+            ],
+          ),
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Done', style: TextStyle(color: Color(0xFF000000))),
+          style: TextButton.styleFrom(foregroundColor: _slate900),
+          child: const Text(
+            'Done',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
         ),
       ],
     );
   }
 
-  Widget _rgbSlider(String label, double value, ValueChanged<double> onChanged) {
+  Widget _rgbSlider(
+      String label, double value, Color trackColor, ValueChanged<double> onChanged) {
     return Row(
       children: [
-        SizedBox(
-          width: 18,
-          child: Text(
-            label,
-            style: const TextStyle(color: Color(0xFF000000)),
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: trackColor,
+            borderRadius: BorderRadius.circular(4),
           ),
         ),
+        const SizedBox(width: 6),
         Expanded(
-          child: Slider(
-            value: value,
-            min: 0,
-            max: 255,
-            onChanged: (v) {
-              onChanged(v);
-              final now = Color.fromRGBO(_r.round(), _g.round(), _b.round(), 1);
-              widget.onChanged(now);
-            },
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: trackColor,
+              thumbColor: trackColor,
+              overlayColor: trackColor.withOpacity(0.15),
+              inactiveTrackColor: trackColor.withOpacity(0.2),
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+            ),
+            child: Slider(
+              value: value,
+              min: 0,
+              max: 255,
+              onChanged: (v) {
+                onChanged(v);
+                final now =
+                    Color.fromRGBO(_r.round(), _g.round(), _b.round(), 1);
+                widget.onChanged(now);
+              },
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 30,
+          child: Text(
+            value.round().toString(),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: _slate600,
+            ),
           ),
         ),
       ],

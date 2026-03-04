@@ -337,28 +337,6 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
     });
   }
 
-  Color _statusColor(String status) {
-    if (status == 'تم التسليم') return const Color(0xFF16A34A);
-    return const Color(0xFFF59E0B);
-  }
-
-  Color _blockBorderColor(int index) {
-    const palette = <Color>[
-      Color(0xFF5B8CFF),
-      Color(0xFF58C4A3),
-      Color(0xFFF4A94B),
-      Color(0xFF9D84F7),
-      Color(0xFF5DA8F2),
-    ];
-    return palette[index % palette.length];
-  }
-
-  String _statusLabel(String status) {
-    if (_isArabic) return status;
-    if (status == 'تم التسليم') return 'Delivered';
-    return 'Pending';
-  }
-
   void _showMsg(String msg, {bool error = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1234,7 +1212,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                         color: resolvedBg,
                                         borderRadius: BorderRadius.circular(cardRadius),
                                         border: Border.all(color: resolvedBorder, width: cardBdrW),
-                                        boxShadow: [BoxShadow(color: cardBgBase.withOpacity(0.35), blurRadius: cardShadow == 0 ? 8 : cardShadow, offset: const Offset(0, 3))],
+                                        boxShadow: [BoxShadow(color: cardBgBase.withOpacity(0.35), blurRadius: cardShadow == 0 ? 8.0 : cardShadow, offset: const Offset(0, 3))],
                                       );
                                     case 2: // Bordered
                                       cardDeco = BoxDecoration(
@@ -1299,7 +1277,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                     'ID: ${customer.id}',
                                                     style: TextStyle(
                                                       color: subTextColor,
-                                                      fontSize: (cardFontSz - 2).clamp(8, 18),
+                                                      fontSize: (cardFontSz - 2.0).clamp(8.0, 18.0),
                                                       fontWeight: FontWeight.w600,
                                                       fontFamily: cardFamily,
                                                     ),
@@ -1505,9 +1483,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                       elevation: 0,
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 24),
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        padding: EdgeInsets.symmetric(horizontal: cfg.cellPaddingH, vertical: 12),
                         decoration: BoxDecoration(
-                          color: tone(cfg.tableHeaderColor),
+                          color: tone(cfg.surface2),
                           borderRadius:
                               const BorderRadius.vertical(top: Radius.circular(12)),
                         ),
@@ -1515,7 +1493,11 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                           textDirection: tableDirection,
                           child: Row(
                             children: [
-                              _HeaderCell(_t('بند الخدمة', 'Service'), 2.5),
+                              _HeaderCell(_t('رقم الفاتورة', 'Invoice No.'), 0.55,
+                                  align: TextAlign.center),
+                              _HeaderCell(_t('الحالة', 'Status'), 0.55,
+                                  align: TextAlign.center),
+                              _HeaderCell(_t('بند الخدمة', 'Service'), 1.4),
                               _HeaderCell(_t('العدد', 'Qty'), 0.8,
                                   align: TextAlign.center),
                               _HeaderCell(_t('سعر الوحدة', 'Unit Price'), 1.1,
@@ -1524,7 +1506,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                   align: TextAlign.center),
                               _HeaderCell(_t('اسم الشركة', 'Company'), 1.8),
                               _HeaderCell(_t('اسم الموظف', 'Employee'), 1.3),
-                              _HeaderCell(_t('المرفقات', 'Files'), 1.8,
+                              _HeaderCell(_t('المرفقات', 'Files'), 1.2,
+                                  align: TextAlign.center),
+                              _HeaderCell(_t('إجمالي المعاملة', 'Tx Total'), 0.6,
                                   align: TextAlign.center),
                             ],
                           ),
@@ -1536,7 +1520,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         ? const Center(child: CircularProgressIndicator())
                         : Container(
                       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      decoration: BoxDecoration(color: tone(cfg.tableAreaColor)),
+                      decoration: BoxDecoration(color: tone(cfg.surface0)),
                       child: !hasSelectedCustomer
                           ? Center(
                               child: Column(
@@ -1583,10 +1567,13 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                           itemCount: data.length,
                           itemBuilder: (context, txIndex) {
                           final tx = data[txIndex];
+                          final statusText = _isArabic
+                              ? tx.status
+                              : (tx.status == 'تم التسليم' ? 'Delivered' : 'Pending');
                           final isSelected =
                               _selectedInvoices.contains(tx.invoiceNumber);
                           final isDelivered = tx.status == 'تم التسليم';
-                          final cardBg = tone(cfg.transactionCardColor);
+                          final cardBg = tone(cfg.surface3);
                           final rowBgA = _design.shiftColor(cardBg, 0.03);
                           final rowBgB = _design.shiftColor(cardBg, -0.03);
 
@@ -1600,115 +1587,52 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                         border: Border.all(
                                           color: isSelected
                                               ? tone(cfg.buttonBgColor)
-                                              : _blockBorderColor(txIndex),
+                                              : tone(cfg.tableHeaderColor)
+                                                  .withOpacity(0.28),
                                           width: cfg.cardBorderWidth + 0.9,
                                         ),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Column(
                                         children: [
-                                          Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 7,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: tone(cfg.tableHeaderColor),
-                                              borderRadius: const BorderRadius.vertical(
-                                                top: Radius.circular(9),
-                                              ),
-                                            ),
-                                            child: Directionality(
-                                              textDirection: tableDirection,
-                                              child: Row(
-                                                children: [
-                                                  SizedBox(
-                                                    width: 22,
-                                                    height: 22,
-                                                    child: Checkbox(
-                                                      value: isSelected,
-                                                      activeColor:
-                                                          const Color(0xFF38BDF8),
-                                                      checkColor: Colors.white,
-                                                      visualDensity:
-                                                          VisualDensity.compact,
-                                                      materialTapTargetSize:
-                                                          MaterialTapTargetSize
-                                                              .shrinkWrap,
-                                                      onChanged: (_) =>
-                                                          _toggleSelection(
-                                                        tx.invoiceNumber,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Expanded(
-                                                    child: Wrap(
-                                                      spacing: 8,
-                                                      runSpacing: 6,
-                                                      crossAxisAlignment:
-                                                          WrapCrossAlignment.center,
-                                                      children: [
-                                                        _TopMetaPill(
-                                                          label:
-                                                              _t('فاتورة', 'Invoice'),
-                                                          value: tx.invoiceNumber,
-                                                          valueColor: const Color(
-                                                              0xFF0EA5E9),
-                                                        ),
-                                                        _TopMetaPill(
-                                                          label:
-                                                              _t('الحالة', 'Status'),
-                                                          value: _statusLabel(
-                                                              tx.status),
-                                                          valueColor:
-                                                              _statusColor(tx.status),
-                                                        ),
-                                                        _TopMetaPill(
-                                                          label:
-                                                              _t('الإجمالي', 'Total'),
-                                                          value:
-                                                              'AED ${tx.grandTotal.toStringAsFixed(2)}',
-                                                          valueColor: const Color(
-                                                              0xFF38BDF8),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    tx.date,
-                                                    style: const TextStyle(
-                                                      color: Color(0xFF9DD6EA),
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
                                           for (int i = 0; i < tx.items.length; i++)
                                             Container(
                                               constraints: BoxConstraints(
-                                                minHeight: cfg.transactionRowHeight,
+                                                minHeight: cfg.effectiveRowHeight,
                                               ),
                                               color: i.isEven
                                                   ? rowBgA
                                                   : rowBgB,
                                               padding: EdgeInsets.symmetric(
-                                                horizontal: 18,
-                                                vertical: cfg.rowVerticalPadding,
+                                                horizontal: cfg.cellPaddingH,
+                                                vertical: cfg.effectiveRowPadding +
+                                                    (i == 0 ? 8 : 0),
                                               ),
                                               child: Directionality(
                                                 textDirection: tableDirection,
                                                 child: Row(
                                                   children: [
                                                     _BodyCell(
+                                                      i == 0 ? tx.invoiceNumber : '',
+                                                      0.55,
+                                                      align: TextAlign.center,
+                                                      color: const Color(0xFF1E3A8A),
+                                                      weight: FontWeight.w700,
+                                                    ),
+                                                    _BodyCell(
+                                                      i == 0 ? statusText : '',
+                                                      0.55,
+                                                      align: TextAlign.center,
+                                                      color: isDelivered
+                                                          ? const Color(0xFF15803D)
+                                                          : const Color(0xFFB45309),
+                                                      weight: FontWeight.w600,
+                                                    ),
+                                                    _BodyCell(
                                                       _isArabic
                                                           ? tx.items[i].serviceAr
                                                           : tx.items[i].serviceEn,
-                                                      2.5,
+                                                      1.4,
                                                       weight: FontWeight.w500,
                                                     ),
                                                     _BodyCell(
@@ -1746,7 +1670,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                       weight: FontWeight.w500,
                                                     ),
                                                     Expanded(
-                                                      flex: 18,
+                                                      flex: 12,
                                                       child: Align(
                                                         alignment: Alignment.center,
                                                         child: Padding(
@@ -1771,6 +1695,16 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                         ),
                                                       ),
                                                     ),
+                                                    _BodyCell(
+                                                      i == 0
+                                                          ? tx.grandTotal
+                                                              .toStringAsFixed(2)
+                                                          : '',
+                                                      0.6,
+                                                      align: TextAlign.center,
+                                                      color: const Color(0xFF0F172A),
+                                                      weight: FontWeight.w700,
+                                                    ),
                                                   ],
                                                 ),
                                               ),
@@ -1778,6 +1712,34 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                         ],
                                       ),
                                     ),
+                                  PositionedDirectional(
+                                    top: 6,
+                                    end: 6,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.92),
+                                        borderRadius: BorderRadius.circular(999),
+                                        border: Border.all(
+                                          color: tone(cfg.tableHeaderColor)
+                                              .withOpacity(0.26),
+                                        ),
+                                      ),
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: Checkbox(
+                                          value: isSelected,
+                                          activeColor: tone(cfg.buttonBgColor),
+                                          checkColor: Colors.white,
+                                          visualDensity: VisualDensity.compact,
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                          onChanged: (_) =>
+                                              _toggleSelection(tx.invoiceNumber),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                   if (isDelivered)
                                     Positioned.fill(
                                       child: IgnorePointer(
@@ -2169,13 +2131,16 @@ class _HeaderCell extends StatelessWidget {
     final cfg = DesignController.instance.config;
     return Expanded(
       flex: (flex * 10).toInt(),
-      child: Text(
-        text,
-        textAlign: align,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: (cfg.baseFontSize - 1).clamp(11, 18),
-          fontWeight: _weightFromLevel(cfg.fontWeightLevel),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: cfg.columnSpacingH / 2),
+        child: Text(
+          text,
+          textAlign: align,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: (cfg.baseFontSize - 1.0).clamp(11.0, 18.0),
+            fontWeight: _weightFromLevel(cfg.fontWeightLevel),
+          ),
         ),
       ),
     );
@@ -2202,17 +2167,23 @@ class _BodyCell extends StatelessWidget {
     final cfg = DesignController.instance.config;
     return Expanded(
       flex: (flex * 10).toInt(),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: align,
-        style: TextStyle(
-          color: color,
-          fontSize: cfg.baseFontSize,
-          fontWeight: weight,
-          height: 1.35,
-          letterSpacing: 0.08,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: cfg.columnSpacingH / 2),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: align,
+          style: TextStyle(
+            color: color,
+            fontSize: cfg.baseFontSize,
+            fontWeight: weight,
+            height: 1.35,
+            letterSpacing: 0.08,
+            fontFeatures: cfg.useTabularFigures
+                ? const [FontFeature.tabularFigures()]
+                : null,
+          ),
         ),
       ),
     );
@@ -2286,49 +2257,6 @@ class _AttachmentIcons extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _TopMetaPill extends StatelessWidget {
-  const _TopMetaPill({
-    required this.label,
-    required this.value,
-    required this.valueColor,
-  });
-
-  final String label;
-  final String value;
-  final Color valueColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: const Color(0x1AFFFFFF),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0x2E93C5DB)),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFFD1E5F2),
-            fontWeight: FontWeight.w600,
-          ),
-          children: [
-            TextSpan(text: '$label: '),
-            TextSpan(
-              text: value,
-              style: TextStyle(
-                color: valueColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
