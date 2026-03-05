@@ -1078,7 +1078,6 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
           );
         }
         return Scaffold(
-          backgroundColor: Colors.red,
           body: Column(
             children: [
               Container(
@@ -1308,11 +1307,11 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
           ),
           Expanded(
             child: Container(
-              color: Colors.yellow.shade100,
+              color: tone(cfg.tableAreaColor),
               child: Column(
                 children: [
                   Material(
-                    color: Colors.yellow.shade100,
+                    color: tone(cfg.tableAreaColor),
                     elevation: 0,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
@@ -1524,7 +1523,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         ? const Center(child: CircularProgressIndicator())
                         : Container(
                       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      decoration: const BoxDecoration(color: Colors.white),
+                      decoration: BoxDecoration(color: tone(cfg.surface0)),
                       child: !hasSelectedCustomer
                           ? Center(
                               child: Column(
@@ -1574,9 +1573,13 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                           final statusText = _isArabic
                               ? tx.status
                               : (tx.status == 'تم التسليم' ? 'Delivered' : 'Pending');
-                          final cardBg = Colors.grey.shade200;
-                          final rowBgA = Colors.grey.shade200;
-                          final rowBgB = Colors.grey.shade200;
+                          final cardBg = _shiftOpaque(
+                            _design,
+                            cfg.transactionCardColor,
+                            txIndex.isEven ? 0.015 : -0.01,
+                          );
+                          final rowBgA = _shiftOpaque(_design, cardBg, 0.012);
+                          final rowBgB = _shiftOpaque(_design, cardBg, -0.012);
 
                           return Column(
                             children: [
@@ -1595,6 +1598,24 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                         builder: (context) {
                                           final item = tx.items.isEmpty ? null : tx.items[i];
                                           final rowBg = (txIndex + i).isEven ? rowBgA : rowBgB;
+                                          final rowInkCandidate = _design.onColorFor(
+                                            rowBg,
+                                            light: Colors.white,
+                                            dark: Colors.black,
+                                          );
+                                          final rowInk = _design.hasGoodContrast(
+                                            rowInkCandidate,
+                                            rowBg,
+                                            minRatio: 4.5,
+                                          )
+                                              ? rowInkCandidate
+                                              : (_design.hasGoodContrast(
+                                                      Colors.black,
+                                                      rowBg,
+                                                      minRatio: 4.5,
+                                                    )
+                                                    ? Colors.black
+                                                    : Colors.white);
                                           final invoiceText =
                                               tx.invoiceNumber.trim().isEmpty ? 'N/A' : tx.invoiceNumber;
                                           final statusValue =
@@ -1652,67 +1673,67 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                                                     invoiceText,
                                                     0.55,
                                                     align: TextAlign.center,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     statusValue,
                                                     0.62,
                                                     align: TextAlign.center,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     serviceText,
                                                     1.4,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     qtyText,
                                                     0.8,
                                                     align: TextAlign.center,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     unitPriceText,
                                                     1.1,
                                                     align: TextAlign.center,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     totalText,
                                                     1.2,
                                                     align: TextAlign.center,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     companyText,
                                                     1.8,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     employeeText,
                                                     1.3,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     filesText,
                                                     1.2,
                                                     align: TextAlign.center,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                   _BodyCell(
                                                     grandTotalText,
                                                     0.6,
                                                     align: TextAlign.center,
-                                                    color: Colors.black,
+                                                    color: rowInk,
                                                     weight: FontWeight.bold,
                                                   ),
                                                 ],
@@ -2063,9 +2084,19 @@ class _HeaderCell extends StatelessWidget {
           text,
           textAlign: align,
           style: TextStyle(
-            color: Colors.red,
+            color: controller.hasGoodContrast(
+              const Color(0xFF111827),
+              cfg.tableHeaderColor,
+              minRatio: 4.5,
+            )
+                ? const Color(0xFF111827)
+                : controller.onColorFor(
+                    cfg.tableHeaderColor,
+                    light: Colors.white,
+                    dark: Colors.black,
+                  ),
             fontSize: (cfg.baseFontSize - 1.0).clamp(11.0, 18.0),
-            fontWeight: FontWeight.bold,
+            fontWeight: _weightFromLevel(cfg.fontWeightLevel),
           ),
         ),
       ),
@@ -2103,7 +2134,7 @@ class _BodyCell extends StatelessWidget {
           style: TextStyle(
             color: color,
             fontSize: cfg.baseFontSize.clamp(11.0, 22.0),
-            fontWeight: FontWeight.bold,
+            fontWeight: weight,
             height: 1.35,
             letterSpacing: 0.08,
             fontFeatures: cfg.useTabularFigures
@@ -2129,11 +2160,20 @@ class _AttachmentIcons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cfg = DesignController.instance.config;
+    final controller = DesignController.instance;
+    final hintInk = controller.hasGoodContrast(
+      const Color(0xFF475569),
+      cfg.surface0,
+      minRatio: 3.5,
+    )
+        ? const Color(0xFF475569)
+        : controller.onColorFor(cfg.surface0, light: Colors.white, dark: Colors.black);
     final validPaths = attachmentPaths.where((e) => e.trim().isNotEmpty).toList();
     if (validPaths.isEmpty) {
-      return const Text(
+      return Text(
         '-',
-        style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+        style: TextStyle(color: hintInk, fontSize: 12, fontWeight: FontWeight.w600),
       );
     }
 
@@ -2162,10 +2202,16 @@ class _AttachmentIcons extends StatelessWidget {
                     p.basename(validPaths[i]),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
+                      fontWeight: FontWeight.w600,
+                      color: controller.hasGoodContrast(
+                        const Color(0xFF1E293B),
+                        const Color(0xFFEFF6FF),
+                        minRatio: 4.5,
+                      )
+                          ? const Color(0xFF1E293B)
+                          : Colors.black,
                     ),
                   ),
                   backgroundColor: const Color(0xFFEFF6FF),
