@@ -145,6 +145,8 @@ class DesignController extends ChangeNotifier {
       _previewUpdate(_config.copyWith(transactionCardColor: color));
   Future<void> setSidebarColor(Color color) =>
       _previewUpdate(_config.copyWith(sidebarColor: color));
+  Future<void> setMainHeaderColor(Color color) =>
+      _previewUpdate(_config.copyWith(mainHeaderColor: color));
   Future<void> setAttachmentIconSize(double value) =>
       _previewUpdate(_config.copyWith(attachmentIconSize: value));
   Future<void> setTransactionRowHeight(double value) =>
@@ -262,6 +264,7 @@ class DesignController extends ChangeNotifier {
       tableAreaColor: tone(isDark ? 0.02 : -0.20, 0.02),
       transactionCardColor: tone(isDark ? 0.08 : -0.10, 0.04),
       sidebarColor: tone(isDark ? 0.01 : -0.22, 0.03),
+      mainHeaderColor: tone(isDark ? 0.06 : -0.14, 0.03),
       buttonBgColor: seed,
       buttonTextColor: onColorFor(seed),
       buttonBorderColor: seed.withOpacity(0.5),

@@ -6,6 +6,7 @@ class AppDesignConfig {
     required this.tableAreaColor,
     required this.transactionCardColor,
     required this.sidebarColor,
+    required this.mainHeaderColor,
     required this.transactionRowHeight,
     required this.rowVerticalPadding,
     required this.cardSpacing,
@@ -59,6 +60,7 @@ class AppDesignConfig {
   final Color tableAreaColor;
   final Color transactionCardColor;
   final Color sidebarColor;
+  final Color mainHeaderColor;
   final double transactionRowHeight;
   final double rowVerticalPadding;
   final double cardSpacing;
@@ -174,6 +176,7 @@ class AppDesignConfig {
     tableAreaColor: Color(0xFF0F172A),
     transactionCardColor: Color(0xFF1E293B),
     sidebarColor: Color(0xFF111827),
+    mainHeaderColor: Color(0xFF1E293B),
     transactionRowHeight: 46,
     rowVerticalPadding: 8,
     cardSpacing: 7,
@@ -228,6 +231,7 @@ class AppDesignConfig {
     Color? tableAreaColor,
     Color? transactionCardColor,
     Color? sidebarColor,
+    Color? mainHeaderColor,
     double? transactionRowHeight,
     double? rowVerticalPadding,
     double? cardSpacing,
@@ -281,6 +285,7 @@ class AppDesignConfig {
       tableAreaColor: tableAreaColor ?? this.tableAreaColor,
       transactionCardColor: transactionCardColor ?? this.transactionCardColor,
       sidebarColor: sidebarColor ?? this.sidebarColor,
+      mainHeaderColor: mainHeaderColor ?? this.mainHeaderColor,
       transactionRowHeight: _clamp(transactionRowHeight ?? this.transactionRowHeight, 34, 74),
       rowVerticalPadding: _clamp(rowVerticalPadding ?? this.rowVerticalPadding, 2, 24),
       cardSpacing: _clamp(cardSpacing ?? this.cardSpacing, 2, 24),
@@ -338,6 +343,7 @@ class AppDesignConfig {
       'tableAreaColor': tableAreaColor.value,
       'transactionCardColor': transactionCardColor.value,
       'sidebarColor': sidebarColor.value,
+      'mainHeaderColor': mainHeaderColor.value,
       'transactionRowHeight': transactionRowHeight,
       'rowVerticalPadding': rowVerticalPadding,
       'cardSpacing': cardSpacing,
@@ -396,6 +402,7 @@ class AppDesignConfig {
       transactionCardColor:
           _colorOrDefault(json['transactionCardColor'], defaults.transactionCardColor),
       sidebarColor: _colorOrDefault(json['sidebarColor'], defaults.sidebarColor),
+      mainHeaderColor: _colorOrDefault(json['mainHeaderColor'], defaults.mainHeaderColor),
       transactionRowHeight:
           _doubleOrDefault(json['transactionRowHeight'], defaults.transactionRowHeight),
       rowVerticalPadding:

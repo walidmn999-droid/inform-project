@@ -505,6 +505,7 @@ class DesignSettingsPage extends StatelessWidget {
               icon: Icons.table_rows_rounded,
               accentColor: const Color(0xFF0EA5E9),
               children: [
+                _ColorTile(label: _t('لون الهيدر الرئيسي (اسم العميل + الإجراءات)', 'Main header color (customer + actions)'), color: cfg.mainHeaderColor, onPicked: (c) => controller.setMainHeaderColor(c)),
                 _ColorTile(label: _t('لون هيدر الجدول', 'Table header color'), color: cfg.tableHeaderColor, onPicked: (c) => controller.setTableHeaderColor(c)),
                 _ColorTile(label: _t('لون خلفية الجدول', 'Table area color'), color: cfg.tableAreaColor, onPicked: (c) => controller.setTableAreaColor(c)),
                 _ColorTile(label: _t('لون كروت المعاملات', 'Transaction card color'), color: cfg.transactionCardColor, onPicked: (c) => controller.setTransactionCardColor(c)),

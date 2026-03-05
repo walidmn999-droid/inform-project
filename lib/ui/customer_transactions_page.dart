@@ -885,6 +885,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
       builder: (context, _) {
         final cfg = _design.config;
         Color tone(Color c) => _opaqueColor(_design.shiftColor(c, cfg.uiBrightnessShift));
+        final mainHeaderBg = tone(cfg.mainHeaderColor);
+        final mainHeaderText = _design.onColorFor(mainHeaderBg);
+        final tableHeaderBg = tone(cfg.tableHeaderColor);
         final addBtn = cfg.useDistinctActionButtonColors
             ? cfg.actionAddButtonColor
             : cfg.buttonBgColor;
@@ -956,9 +959,9 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
             height: headerCardHeight,
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
             decoration: BoxDecoration(
-              color: _shiftOpaque(_design, cfg.tableHeaderColor, -0.03),
+              color: mainHeaderBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0x334AA3FF)),
+              border: Border.all(color: _shiftOpaque(_design, cfg.mainHeaderColor, 0.16)),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -968,8 +971,8 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                   customerName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: mainHeaderText,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -977,8 +980,8 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                 const SizedBox(height: 2),
                 Text(
                   _t('رقم العميل: ${widget.customerId}', 'Customer ID: ${widget.customerId}'),
-                  style: const TextStyle(
-                    color: Color(0xFFE2ECFA),
+                  style: TextStyle(
+                    color: _shiftOpaque(_design, mainHeaderText, 0.24),
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1052,7 +1055,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
         }
         Widget buildHeaderLanguageButtons() {
           final active = tone(cfg.buttonBgColor);
-          final inactive = tone(cfg.tableHeaderColor);
+          final inactive = _shiftOpaque(_design, cfg.mainHeaderColor, 0.12);
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1075,6 +1078,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
           );
         }
         return Scaffold(
+          backgroundColor: Colors.red,
           body: Column(
             children: [
               Container(
@@ -1304,16 +1308,17 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
           ),
           Expanded(
             child: Container(
-              color: tone(cfg.tableAreaColor),
+              color: Colors.yellow.shade100,
               child: Column(
                 children: [
                   Material(
-                    color: tone(cfg.tableAreaColor),
+                    color: Colors.yellow.shade100,
                     elevation: 0,
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                       child: Container(
                         decoration: BoxDecoration(
+                          color: mainHeaderBg,
                           border: Border.all(color: const Color(0xFF2563EB), width: 1.4),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -1484,7 +1489,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         margin: const EdgeInsets.symmetric(horizontal: 24),
                         padding: EdgeInsets.symmetric(horizontal: cfg.cellPaddingH, vertical: 12),
                         decoration: BoxDecoration(
-                          color: tone(cfg.surface2),
+                          color: tableHeaderBg,
                           borderRadius:
                               const BorderRadius.vertical(top: Radius.circular(12)),
                         ),
@@ -1494,7 +1499,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                             children: [
                               _HeaderCell(_t('رقم الفاتورة', 'Invoice No.'), 0.55,
                                   align: TextAlign.center),
-                              _HeaderCell(_t('الحالة', 'Status'), 0.55,
+                              _HeaderCell(_t('الحالة', 'Status'), 0.62,
                                   align: TextAlign.center),
                               _HeaderCell(_t('بند الخدمة', 'Service'), 1.4),
                               _HeaderCell(_t('العدد', 'Qty'), 0.8,
@@ -1519,7 +1524,7 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                         ? const Center(child: CircularProgressIndicator())
                         : Container(
                       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                      decoration: BoxDecoration(color: tone(cfg.surface0)),
+                      decoration: const BoxDecoration(color: Colors.white),
                       child: !hasSelectedCustomer
                           ? Center(
                               child: Column(
@@ -1569,195 +1574,155 @@ class _CustomerTransactionsPageState extends State<CustomerTransactionsPage> {
                           final statusText = _isArabic
                               ? tx.status
                               : (tx.status == 'تم التسليم' ? 'Delivered' : 'Pending');
-                          final isSelected =
-                              _selectedInvoices.contains(tx.invoiceNumber);
-                          final isDelivered = tx.status == 'تم التسليم';
-                          final cardBg = tone(cfg.surface3);
-                          final rowBgA = _design.shiftColor(cardBg, 0.03);
-                          final rowBgB = _design.shiftColor(cardBg, -0.03);
+                          final cardBg = Colors.grey.shade200;
+                          final rowBgA = Colors.grey.shade200;
+                          final rowBgB = Colors.grey.shade200;
 
                           return Column(
                             children: [
-                              Stack(
-                                children: [
-                                  Container(
-                                      decoration: BoxDecoration(
-                                        color: cardBg,
-                                        border: Border.all(
-                                          color: isSelected
-                                              ? tone(cfg.buttonBgColor)
-                                              : tone(cfg.tableHeaderColor)
-                                                  .withAlpha(0x26),
-                                          width: cfg.cardBorderWidth + 0.9,
-                                        ),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Column(
-                                        children: [
-                                          for (int i = 0; i < tx.items.length; i++)
-                                            Container(
-                                              constraints: BoxConstraints(
-                                                minHeight: cfg.effectiveRowHeight,
-                                              ),
-                                              color: i.isEven
-                                                  ? rowBgA
-                                                  : rowBgB,
-                                              padding: EdgeInsets.symmetric(
-                                                horizontal: cfg.cellPaddingH,
-                                                vertical: cfg.effectiveRowPadding +
-                                                    (i == 0 ? 8 : 0),
-                                              ),
-                                              child: Directionality(
-                                                textDirection: tableDirection,
-                                                child: Row(
-                                                  children: [
-                                                    _BodyCell(
-                                                      i == 0 ? tx.invoiceNumber : '',
-                                                      0.55,
-                                                      align: TextAlign.center,
-                                                      color: const Color(0xFF1E3A8A),
-                                                      weight: FontWeight.w700,
-                                                    ),
-                                                    _BodyCell(
-                                                      i == 0 ? statusText : '',
-                                                      0.55,
-                                                      align: TextAlign.center,
-                                                      color: isDelivered
-                                                          ? const Color(0xFF15803D)
-                                                          : const Color(0xFFB45309),
-                                                      weight: FontWeight.w600,
-                                                    ),
-                                                    _BodyCell(
-                                                      _isArabic
-                                                          ? tx.items[i].serviceAr
-                                                          : tx.items[i].serviceEn,
-                                                      1.4,
-                                                      weight: FontWeight.w500,
-                                                    ),
-                                                    _BodyCell(
-                                                      '${tx.items[i].qty}',
-                                                      0.8,
-                                                      align: TextAlign.center,
-                                                    ),
-                                                    _BodyCell(
-                                                      tx.items[i].unitPrice
-                                                          .toStringAsFixed(2),
-                                                      1.1,
-                                                      align: TextAlign.center,
-                                                    ),
-                                                    _BodyCell(
-                                                      tx.items[i].total
-                                                          .toStringAsFixed(2),
-                                                      1.2,
-                                                      align: TextAlign.center,
-                                                      weight: FontWeight.w600,
-                                                    ),
-                                                    _BodyCell(
-                                                      _isArabic
-                                                          ? tx.items[i].companyAr
-                                                          : tx.items[i].companyEn,
-                                                      1.8,
-                                                      color: const Color(0xFF1E5A8A),
-                                                      weight: FontWeight.w500,
-                                                    ),
-                                                    _BodyCell(
-                                                      _isArabic
-                                                          ? tx.items[i].employeeAr
-                                                          : tx.items[i].employeeEn,
-                                                      1.3,
-                                                      color: const Color(0xFF0E7490),
-                                                      weight: FontWeight.w500,
-                                                    ),
-                                                    Expanded(
-                                                      flex: 12,
-                                                      child: Align(
-                                                        alignment: Alignment.center,
-                                                        child: Padding(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                            vertical: 2,
-                                                            horizontal: 4,
-                                                          ),
-                                                          child: _AttachmentIcons(
-                                                            attachmentPaths:
-                                                                tx.items[i]
-                                                                    .attachmentPaths,
-                                                            iconSize:
-                                                                cfg.attachmentIconSize,
-                                                            onTapFile: (index) =>
-                                                                _onAttachmentIconTap(
-                                                              tx.items[i]
-                                                                  .attachmentPaths,
-                                                              index,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    _BodyCell(
-                                                      i == 0
-                                                          ? tx.grandTotal
-                                                              .toStringAsFixed(2)
-                                                          : '',
-                                                      0.6,
-                                                      align: TextAlign.center,
-                                                      color: const Color(0xFF0F172A),
-                                                      weight: FontWeight.w700,
-                                                    ),
-                                                  ],
-                                                ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: cardBg,
+                                  border: Border.all(color: const Color(0xFFBDBDBD), width: 1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Column(
+                                  children: [
+                                    for (int i = 0;
+                                        i < (tx.items.isEmpty ? 1 : tx.items.length);
+                                        i++)
+                                      Builder(
+                                        builder: (context) {
+                                          final item = tx.items.isEmpty ? null : tx.items[i];
+                                          final rowBg = (txIndex + i).isEven ? rowBgA : rowBgB;
+                                          final invoiceText =
+                                              tx.invoiceNumber.trim().isEmpty ? 'N/A' : tx.invoiceNumber;
+                                          final statusValue =
+                                              statusText.trim().isEmpty ? 'N/A' : statusText;
+                                          final serviceText = _isArabic
+                                              ? ((item?.serviceAr ?? '').trim().isEmpty
+                                                  ? 'N/A'
+                                                  : item!.serviceAr)
+                                              : ((item?.serviceEn ?? '').trim().isEmpty
+                                                  ? 'N/A'
+                                                  : item!.serviceEn);
+                                          final qtyText = item == null ? 'N/A' : '${item.qty}';
+                                          final unitPriceText = item == null
+                                              ? 'N/A'
+                                              : item.unitPrice.toStringAsFixed(2);
+                                          final totalText = item == null
+                                              ? 'N/A'
+                                              : item.total.toStringAsFixed(2);
+                                          final companyText = _isArabic
+                                              ? ((item?.companyAr ?? '').trim().isEmpty
+                                                  ? 'N/A'
+                                                  : item!.companyAr)
+                                              : ((item?.companyEn ?? '').trim().isEmpty
+                                                  ? 'N/A'
+                                                  : item!.companyEn);
+                                          final employeeText = _isArabic
+                                              ? ((item?.employeeAr ?? '').trim().isEmpty
+                                                  ? 'N/A'
+                                                  : item!.employeeAr)
+                                              : ((item?.employeeEn ?? '').trim().isEmpty
+                                                  ? 'N/A'
+                                                  : item!.employeeEn);
+                                          final filesText = item == null
+                                              ? 'N/A'
+                                              : (item.attachmentPaths.isEmpty
+                                                  ? 'N/A'
+                                                  : '${item.attachmentPaths.length}');
+                                          final grandTotalText =
+                                              tx.grandTotal.toStringAsFixed(2);
+
+                                          return Container(
+                                            constraints: BoxConstraints(
+                                              minHeight: cfg.effectiveRowHeight,
+                                            ),
+                                            color: rowBg,
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: cfg.cellPaddingH,
+                                              vertical: cfg.effectiveRowPadding,
+                                            ),
+                                            child: Directionality(
+                                              textDirection: tableDirection,
+                                              child: Row(
+                                                children: [
+                                                  _BodyCell(
+                                                    invoiceText,
+                                                    0.55,
+                                                    align: TextAlign.center,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    statusValue,
+                                                    0.62,
+                                                    align: TextAlign.center,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    serviceText,
+                                                    1.4,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    qtyText,
+                                                    0.8,
+                                                    align: TextAlign.center,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    unitPriceText,
+                                                    1.1,
+                                                    align: TextAlign.center,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    totalText,
+                                                    1.2,
+                                                    align: TextAlign.center,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    companyText,
+                                                    1.8,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    employeeText,
+                                                    1.3,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    filesText,
+                                                    1.2,
+                                                    align: TextAlign.center,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                  _BodyCell(
+                                                    grandTotalText,
+                                                    0.6,
+                                                    align: TextAlign.center,
+                                                    color: Colors.black,
+                                                    weight: FontWeight.bold,
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                        ],
+                                          );
+                                        },
                                       ),
-                                    ),
-                                  PositionedDirectional(
-                                    top: 6,
-                                    end: 6,
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFFFFF),
-                                        borderRadius: BorderRadius.circular(999),
-                                        border: Border.all(
-                                          color: tone(cfg.tableHeaderColor)
-                                              .withAlpha(0x26),
-                                        ),
-                                      ),
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: Checkbox(
-                                          value: isSelected,
-                                          activeColor: tone(cfg.buttonBgColor),
-                                          checkColor: Colors.white,
-                                          visualDensity: VisualDensity.compact,
-                                          materialTapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                          onChanged: (_) =>
-                                              _toggleSelection(tx.invoiceNumber),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (isDelivered)
-                                    Positioned.fill(
-                                      child: IgnorePointer(
-                                        child: Center(
-                                          child: Transform.rotate(
-                                            angle: -0.25,
-                                            child: Text(
-                                              _t('تم التسليم', 'DELIVERED'),
-                                              style: const TextStyle(
-                                                fontSize: 64,
-                                                fontWeight: FontWeight.w900,
-                                                color: Color(0x22000000),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
                               if (txIndex < data.length - 1)
                                 SizedBox(height: cfg.cardSpacing),
@@ -2088,7 +2053,8 @@ class _HeaderCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cfg = DesignController.instance.config;
+    final controller = DesignController.instance;
+    final cfg = controller.config;
     return Expanded(
       flex: (flex * 10).toInt(),
       child: Padding(
@@ -2097,9 +2063,9 @@ class _HeaderCell extends StatelessWidget {
           text,
           textAlign: align,
           style: TextStyle(
-            color: Colors.white,
+            color: Colors.red,
             fontSize: (cfg.baseFontSize - 1.0).clamp(11.0, 18.0),
-            fontWeight: _weightFromLevel(cfg.fontWeightLevel),
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
@@ -2136,8 +2102,8 @@ class _BodyCell extends StatelessWidget {
           textAlign: align,
           style: TextStyle(
             color: color,
-            fontSize: cfg.baseFontSize,
-            fontWeight: weight,
+            fontSize: cfg.baseFontSize.clamp(11.0, 22.0),
+            fontWeight: FontWeight.bold,
             height: 1.35,
             letterSpacing: 0.08,
             fontFeatures: cfg.useTabularFigures
@@ -2167,7 +2133,7 @@ class _AttachmentIcons extends StatelessWidget {
     if (validPaths.isEmpty) {
       return const Text(
         '-',
-        style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+        style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
       );
     }
 
@@ -2198,8 +2164,8 @@ class _AttachmentIcons extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E293B),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
                     ),
                   ),
                   backgroundColor: const Color(0xFFEFF6FF),
